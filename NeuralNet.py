@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+# author : yunjin zhaolong
 from __future__ import print_function
 import argparse
 import torch
@@ -6,6 +8,7 @@ from torch.utils.data import Dataset,DataLoader
 from torch import nn, optim
 import pandas as pd
 import numpy as np
+import os
 
 class MLP(nn.Module):
     def __init__(self, n_feature, n_hidden, n_output):
@@ -17,6 +20,14 @@ class MLP(nn.Module):
         self.hidden_2 = torch.nn.Linear(n_hidden, n_hidden//2)
 
         self.out = torch.nn.Linear(n_hidden//2, n_output)  # output layer
+
+    def init_weight(self):
+        for param in self.parameters():
+            if len(param.shape) > 1:
+                nn.init.xavier_uniform(param)
+            else:
+                nn.init.constant(param, 0.1)
+            pass
 
     def forward(self, x):
 
@@ -64,11 +75,13 @@ class myDataset(Dataset):
 
 def train(epochs,model):
     L = []
+    best_loss = float('inf')
     for epoch in range(1, epochs +1):
         model.train()
         train_loss = 0
         for batch_idx, (x,y) in enumerate(train_loader):
             x = x.to(device)
+            y = y.to(device) # put y to the same device
             optimizer.zero_grad()
             pred_y = model(x)
 
@@ -76,14 +89,17 @@ def train(epochs,model):
             loss.backward()
             train_loss += loss.item()
             optimizer.step()
+        epoch_loss = train_loss / len(train_loader.dataset)
         if epoch % 10 == 0:
                 print('====> Epoch: {} Average loss: {:.4f}'.format(
-                epoch, train_loss / len(train_loader.dataset)))
+                epoch, epoch_loss ))
+        if epoch_loss < best_loss:
+            best_loss = epoch_loss
         L.append(train_loss / len(train_loader.dataset))
 
     import matplotlib.pyplot as plt 
     plt.plot(np.array(L))
-    plt.show()
+    plt.savefig(os.path.join(train_output , "hidden_size({})_mse({}).png".format(4 , best_loss))) #文件命名以 hyperparameter_metrice 形式
     return model 
 
 
@@ -105,22 +121,27 @@ def test(model):
 torch.manual_seed(1234)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-trainpath = 'E:/BaiduNetdiskDownload/compeition_sigir2020/Train/Train_data/'
+trainpath = 'datasets/compeition_sigir2020/Train/Train_data'
 
 trainfiles_3m = ['LMEAluminium3M_train.csv','LMECopper3M_train.csv','LMELead3M_train.csv','LMENickel3M_train.csv','LMETin3M_train.csv','LMEZinc3M_train.csv']
+
+train_output = 'output/train_loss/mlp' #命名以 model 进行命名
+if not os.path.exists(train_output):
+    os.makedirs(train_output)
 
 for ind in range(len(trainfiles_3m)):
     
 
     for i in [1, 20, 60]:
         # The train_data doesn't split training set and test set, so we do it manually by pass a string parameter.
-        train_data  =  myDataset(trainpath+trainfiles_3m[ind],i,'train')
-        test_data  =  myDataset(trainpath+trainfiles_3m[ind],i,'test')
+        train_data  =  myDataset(os.path.join(trainpath , trainfiles_3m[ind]),i,'train')
+        test_data  =  myDataset(os.path.join(trainpath , trainfiles_3m[ind]),i,'test')
 
         train_loader = DataLoader(dataset=train_data, batch_size=20, shuffle=False)
         test_loader = DataLoader(dataset=test_data, batch_size=20, shuffle=False)
         
         mlp = MLP(n_feature=1 ,n_hidden=4,n_output=1).to(device)
+        mlp.init_weight() # 增加初始化
         optimizer = optim.SGD(mlp.parameters(), lr=0.001)
 
         mlp = train(epochs=200, model = mlp)
