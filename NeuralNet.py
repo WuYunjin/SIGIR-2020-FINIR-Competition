@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # -*- coding: UTF-8 -*-
 # author : yunjin zhaolong
 from __future__ import print_function
@@ -228,4 +229,3 @@ for ind in range(len(trainfiles_3m)):
 #     prediction = prediction.append(temp)
 
 # prediction['label'] = prediction['label'].astype(int)
-# prediction.to_csv('E:/BaiduNetdiskDownload/compeition_sigir2020/result.csv',index=False)
