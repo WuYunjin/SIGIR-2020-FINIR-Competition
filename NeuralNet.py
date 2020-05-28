@@ -84,8 +84,12 @@ class myDataset(Dataset):
         y = torch.tensor(self.y[idx]).float() # Price at T+self.day day
         return x,y  
 
-def train(epochs,model):
+def train(epochs,model, metal, day):
+    # metal : what kind of metal
+    # day:  1 or 20 or 60.
     L = []
+    y1 = np.array([])
+    y2 = np.array([])
     best_loss = float('inf')
     for epoch in range(1, epochs +1):
         model.train()
@@ -100,6 +104,11 @@ def train(epochs,model):
             loss.backward()
             train_loss += loss.item()
             optimizer.step()
+            
+            if epoch == epochs:
+                y1 = np.append(y1,y.detach().numpy())
+                y2 = np.append(y2,pred_y.detach().numpy())
+
         epoch_loss = train_loss / len(train_loader.dataset)
         if epoch % 10 == 0:
                 print('====> Epoch: {} Average loss: {:.4f}'.format(
@@ -110,12 +119,18 @@ def train(epochs,model):
 
     import matplotlib.pyplot as plt 
     plt.plot(np.array(L))
-    plt.savefig(os.path.join(train_output , "hidden_size({})_mse({}).png".format(4 , best_loss))) #文件命名以 hyperparameter_metrice 形式
+    plt.savefig(os.path.join(train_output , "{}_{}day_hidden_size({})_mse({}).png".format(metal.split('_')[0].strip('3M'), day ,4 , best_loss))) #文件命名以 hyperparameter_metrice 形式
+    plt.close()
+
+    plt.plot(y1,label='real',color='blue')
+    plt.plot(y2,label='pred',color='red')
+    plt.legend()
+    plt.savefig(os.path.join("output/{}_{}day_trainingset_prediction_vs_real.png").format(metal.split('_')[0].strip('3M'), day ))
     plt.close()
     return model 
 
 
-def test(model):
+def test(model, metal, day):
     model.eval()
     test_loss = 0
     y1 = np.array([])
@@ -135,7 +150,7 @@ def test(model):
         plt.plot(y1,label='real',color='blue')
         plt.plot(y2,label='pred',color='red')
         plt.legend()
-        plt.savefig(os.path.join("./testset_prediction_vs_real.png"))
+        plt.savefig(os.path.join("output/{}_{}day_testset_prediction_vs_real.png").format(metal.split('_')[0].strip('3M'), day ))
         plt.close()
 
 
@@ -159,19 +174,19 @@ for ind in range(len(trainfiles_3m)):
         train_data  =  myDataset(os.path.join(trainpath , trainfiles_3m[ind]),i,'train')
         test_data  =  myDataset(os.path.join(trainpath , trainfiles_3m[ind]),i,'test')
 
-        train_loader = DataLoader(dataset=train_data, batch_size=20, shuffle=False)
-        test_loader = DataLoader(dataset=test_data, batch_size=20, shuffle=False)
+        train_loader = DataLoader(dataset=train_data, batch_size=1, shuffle=False)
+        test_loader = DataLoader(dataset=test_data, batch_size=1, shuffle=False)
         
         mlp = MLP(n_feature=1 ,n_hidden=4,n_output=1).to(device)
         mlp.init_weight() # 增加初始化
         optimizer = optim.SGD(mlp.parameters(), lr=0.001)
 
-        mlp = train(epochs=500, model = mlp)
-        test(model = mlp)
+        mlp = train(epochs=500, model = mlp, metal=trainfiles_3m[ind], day=i)
+        test(model = mlp, metal=trainfiles_3m[ind], day=i)
         # torch.save(mlp,'E:/BaiduNetdiskDownload/compeition_sigir2020/%sday_%s_model'%(i,trainfiles_3m[ind].split('_')[0].strip('3M')))
         
 
-        break
+        # break
     break
 
 
