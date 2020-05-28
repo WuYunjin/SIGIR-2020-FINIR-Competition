@@ -133,3 +133,5 @@ dmypy.json
 *.zip
 *.png
 
+#vscode
+.vscode
