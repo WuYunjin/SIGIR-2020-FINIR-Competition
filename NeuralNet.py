@@ -10,6 +10,14 @@ import pandas as pd
 import numpy as np
 import os
 
+
+torch.manual_seed(1234)
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+from sklearn.preprocessing import MinMaxScaler
+sc = MinMaxScaler()
+
 class MLP(nn.Module):
     def __init__(self, n_feature, n_hidden, n_output):
         super(MLP, self).__init__()
@@ -55,12 +63,10 @@ class myDataset(Dataset):
         data = pd.read_csv(filepath,delimiter=',',index_col=0,usecols=(1,5))  # Only use Close.Price for now.
 
         if flag == 'train':
-            x =  data[-1011:-252].values # Price from 2014-1-2 to 2016-12-30
-            y = data[-1011+day:-252+day].values  # Price from 2014-1-2+day to 2016-12-30+day
+            x =  data[-253:-day].values # Price from 2014-1-2 to 2016-12-30
+            y = data[-253+day:].values  # Price from 2014-1-2+day to 2016-12-30+day
 
 
-            from sklearn.preprocessing import MinMaxScaler
-            sc = MinMaxScaler()
             x = np.reshape(x,(-1,1)) # For scaling
             x = sc.fit_transform(x)
             x = np.reshape(x, (len(x),1,1))
@@ -68,9 +74,6 @@ class myDataset(Dataset):
             y = np.reshape(y,(-1,1)) # For scaling
             y = sc.fit_transform(y)
 
-        elif flag == 'test':
-            x = data[-252:-day].values  # Price from 2017-1-3 to 2017-12-29 - day.
-            y = data[-252+day:].values  # Price from 2017-1-3 + day to 2017-12-29 .
 
         self.x = x
         self.y = y
@@ -153,14 +156,51 @@ def test(model, metal, day):
         plt.savefig(os.path.join("output/{}_{}day_testset_prediction_vs_real.png").format(metal.split('_')[0].strip('3M'), day ))
         plt.close()
 
+def val(model,data,day):
+    model.eval()
+    pred_price = pd.DataFrame([],index=data.index,columns=['price'])
+    temp = np.array([])
+    with torch.no_grad():
+        for ind,x in enumerate(data.values):
+            
+            
+            x = torch.tensor(x).float().to(device)
+            pred_y = model(x).numpy()
+            if( ind+day >= len(data.values)): 
+                temp = np.append(temp,pred_y)
+            else:
+                pred_price['price'].iloc[ind+day] = pred_y
+
+                
+    pred_price = pred_price.append(pd.DataFrame(temp,columns=['price']))[day:]
+    
+    pred_label = pd.DataFrame([],index=data.index[day:],columns=['label'])
+
+    for ind,x in enumerate(pred_price['price'][:-day].values):
+        if( x < pred_price['price'].iloc[ind+day] ):
+            pred_label['label'].iloc[ind] = 1
+        else:
+            pred_label['label'].iloc[ind] = 0
+
+        
 
 
-torch.manual_seed(1234)
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    price = data.diff(day)
+    price[price>0] = 1
+    price[price<=0] = 0
+    pred = np.append(price.values[day:],[price.values[-1]]*day)
+
+
+    accuracy = np.mean(pred_label.values==pred)
+    print(accuracy)
+
+
 
 trainpath = 'datasets/compeition_sigir2020/Train/Train_data'
-
+valpath = 'datasets/compeition_sigir2020/Validation/Validation_data'
 trainfiles_3m = ['LMEAluminium3M_train.csv','LMECopper3M_train.csv','LMELead3M_train.csv','LMENickel3M_train.csv','LMETin3M_train.csv','LMEZinc3M_train.csv']
+
+valfiles_3m = ['LMEAluminium3M_validation.csv','LMECopper3M_validation.csv','LMELead3M_validation.csv','LMENickel3M_validation.csv','LMETin3M_validation.csv','LMEZinc3M_validation.csv']
 
 train_output = 'output/train_loss/mlp' #命名以 model 进行命名
 if not os.path.exists(train_output):
@@ -169,25 +209,29 @@ if not os.path.exists(train_output):
 for ind in range(len(trainfiles_3m)):
     
 
-    for i in [1, 20, 60]:
+    for i in [1,20,60]:
         # The train_data doesn't split training set and test set, so we do it manually by pass a string parameter.
         train_data  =  myDataset(os.path.join(trainpath , trainfiles_3m[ind]),i,'train')
-        test_data  =  myDataset(os.path.join(trainpath , trainfiles_3m[ind]),i,'test')
+        # test_data  =  myDataset(os.path.join(trainpath , trainfiles_3m[ind]),i,'test')
 
         train_loader = DataLoader(dataset=train_data, batch_size=1, shuffle=False)
-        test_loader = DataLoader(dataset=test_data, batch_size=1, shuffle=False)
+        # test_loader = DataLoader(dataset=test_data, batch_size=1, shuffle=False)
         
         mlp = MLP(n_feature=1 ,n_hidden=4,n_output=1).to(device)
         mlp.init_weight() # 增加初始化
         optimizer = optim.SGD(mlp.parameters(), lr=0.001)
 
-        mlp = train(epochs=500, model = mlp, metal=trainfiles_3m[ind], day=i)
-        test(model = mlp, metal=trainfiles_3m[ind], day=i)
+        mlp = train(epochs=100, model = mlp, metal=trainfiles_3m[ind], day=i)
+        # test(model = mlp, metal=trainfiles_3m[ind], day=i)
+        Valdata = pd.read_csv(os.path.join(valpath, valfiles_3m[ind]),delimiter=',',index_col=0,usecols=(1,5)) 
+        temp = pd.read_csv(os.path.join(trainpath, trainfiles_3m[ind]),delimiter=',',index_col=0,usecols=(1,5))[-i:]
+        Valdata = temp.append(Valdata)
+        val(model=mlp,day=i,data=Valdata)
         # torch.save(mlp,'E:/BaiduNetdiskDownload/compeition_sigir2020/%sday_%s_model'%(i,trainfiles_3m[ind].split('_')[0].strip('3M')))
         
 
         # break
-    break
+    # break
 
 
 
