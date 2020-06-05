@@ -132,6 +132,7 @@ dmypy.json
 #dataset zip and png
 *.zip
 *.png
+*.pkl
 
 #vscode
 .vscode
