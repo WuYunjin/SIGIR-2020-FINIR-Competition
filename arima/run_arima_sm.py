@@ -5,7 +5,6 @@ import os
 import sys
 #将当前工作路径添加进去
 sys.path.insert(0, '.')
-from data_process.utils import create_dataset_if_not_exist , add_time_mark_to_file
 import pickle
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -17,94 +16,71 @@ from pmdarima.preprocessing import BoxCoxEndogTransformer
 
 
 
-target_processed_data = 'LMEAluminium,LMECopper,LMELead,LMENickel,LMETin,LMEZinc'
-start = '2014-01-02'
-freq = '1B'
+trainpath = 'datasets/compeition_sigir2020/Train/Train_data/'
+valpath = 'datasets/compeition_sigir2020/Validation/Validation_data/'
+valfiles_oi = ['LMEAluminium_OI_validation.csv','LMECopper_OI_validation.csv','LMELead_OI_validation.csv','LMENickel_OI_validation.csv','LMETin_OI_validation.csv','LMEZinc_OI_validation.csv']
+valfiles_3m = ['LMEAluminium3M_validation.csv','LMECopper3M_validation.csv','LMELead3M_validation.csv','LMENickel3M_validation.csv','LMETin3M_validation.csv','LMEZinc3M_validation.csv']
+trainfiles_oi = ['LMEAluminium_OI_train.csv','LMECopper_OI_train.csv','LMELead_OI_train.csv','LMENickel_OI_train.csv','LMETin_OI_train.csv','LMEZinc_OI_train.csv']
+trainfiles_3m = ['LMEAluminium3M_train.csv','LMECopper3M_train.csv','LMELead3M_train.csv','LMENickel3M_train.csv','LMETin3M_train.csv','LMEZinc3M_train.csv']
+
+# 是否将原始数据进行差分
+use_diff = False
+prediction = pd.DataFrame()
 timestep = 1303 # to the day of 2018-12-31
-pred = 1
 past = 264 
 slice_style = 'overlap'
 ds_name_prefix = 'data_process/processed_data/{}_{}_{}_{}.pkl'
 
-result_params = '_'.join([
-                                'freq(%s)'%(freq),
-                               'past(%d)'%(past)
-                                ,'pred(%d)'%(pred)
-                             ]
-                        )
+prediction = pd.DataFrame()
+prediction['id'] = []
+prediction['label'] = []
 
 if __name__ == '__main__':
-    # 导入 target 的数据
-    if slice_style == 'overlap':
-        series = timestep - past - pred + 1
-        print('每个数据集的序列数量为 ', series)
-    elif slice_style == 'nolap':
-        series = timestep // (past + pred)
-        print('每个数据集的序列数量为 ', series)
-    else:
-        series = 1
-        print('每个数据集的序列数量为 ', series ,'情景为长单序列')
-    result_root_path  = 'evaluate/results/{}_slice({})_past({})_pred({})'.format(target_processed_data.replace(',' ,'_') , slice_style ,past , pred)
-    if not os.path.exists(result_root_path):
-        os.makedirs(result_root_path)
-    forecast_result_saved_path = os.path.join(result_root_path,'prophet(%s)_' % (target_processed_data.replace(',' ,'_')) + result_params + '.pkl')
-    forecast_result_saved_path = add_time_mark_to_file(forecast_result_saved_path)
-
-     # 目标序列的数据路径
-    target_path = {ds_name: ds_name_prefix.format(
-            '%s_start(%s)_freq(%s)'%(ds_name, start,freq), 'steps(%d)_slice(%s)_DsSeries(%d)'%(timestep , slice_style, series),
-            'train(%d)'%past, 'pred(%d)'%pred,
-    ) for ds_name in target_processed_data.split(',')}
-
-    create_dataset_if_not_exist(
-        paths=target_path, start=start, past_length=past
-        , pred_length=pred, slice=slice_style
-        , timestep=timestep, freq=freq
-    )
-
-    if not os.path.exists(forecast_result_saved_path):
-        sample_forecasts = []
-        
-        for ds_name in target_path:
-            target_processed_data = target_path[ds_name]
+    for ind in range(len(valfiles_oi)):
+        for pred in [1,20,60]:
+     
+            train_3m = pd.read_csv(trainpath+trainfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,5))
+            val_3m = pd.read_csv(valpath+valfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,5))
+            data = train_3m.append(val_3m)
+            feature = 'Close.Price'
+            price = data[feature]
+            if use_diff:
+                #将目标序列从原始序列变成 差分序列
+                price = price.diff(1)[train_3m.shape[0]-past-pred+1:]
+            else:
+                price = price[train_3m.shape[0]-past-pred+1:]
             
-            with open(target_processed_data, 'rb') as fp:
-                target_ds = pickle.load(fp)
-                print('导入原始数据成功~~~')
-                assert target_ds.metadata['dim'] == 1, 'target 序列的维度都应该为1'
+            prefix = valfiles_oi[ind].split('_')[0]+'-validation-{}d-'.format(pred)
+            #滑动窗口
+            for i in range(past+pred-1, len(data)):
+                print('===========当前训练的是{}数据集，目标节点是{}=================='.format(
+                    valfiles_oi[ind].split('_')[0] , val_3m.index[(i - (past+pred) + 1)]))
+                sample = price[(i - (past+pred) + 1):(i + 1)]
+                train, test = train_test_split(sample, train_size=past)
+                pipeline = Pipeline([
+                    # ('boxcox', BoxCoxEndogTransformer(lmbda2=1e-6)),  # lmbda2 avoids negative values
+                    ('arima', pm.AutoARIMA(seasonal=True, m=1, 
+                                        suppress_warnings=True,
+                                        trace=True,error_action="ignore"))
+                ])
+
+                pipeline.fit(train )
+                pred_result = pipeline.predict(pred)
+                print('pred_result is : ' , pred_result)
+                print('====================一次训练结束=============================\n\n\n')
                 
-                train_result = []
-                val_result = []
-                for entry in target_ds.train:
-                    pipeline = Pipeline([
-                        ('boxcox', BoxCoxEndogTransformer(lmbda2=1e-6)),  # lmbda2 avoids negative values
-                        ('arima', pm.AutoARIMA(seasonal=True, m=12,
-                                            suppress_warnings=True,
-                                            trace=True))
-                    ])
+                val_index = prefix + val_3m.index[(i - (past+pred) + 1)]
+                if use_diff:
+                    val_label = 1 if pred_result[-1] > 0 else 0
+                else:
+                    val_label = 1 if pred_result[-1] - train[-1] > 0 else 0
+                prediction = prediction.append({'id':val_index , 'label':val_label} , ignore_index=True)
 
-                    pipeline.fit(entry['target'].squeeze())
-                    result = pipeline.predict(pred)
-
-                    #预测时间大于等于2018-01-02开始算验证集的结果
-                    if entry['forecast_start'] >= pd.Timestamp('2018-01-02'):
-                        val_result.append(result)
-                    else:
-                        train_result.append(result)
-                    
-                    
-                    
-                    # Serialize your model just like you would in scikit:
-                    # with open('arima_past({}).pkl'.format(past), 'wb') as pkl:
-                    #     pickle.dump(pipeline, pkl)
                 
-                        
-                        
-
-        sample_forecasts = np.concatenate(sample_forecasts, axis=0)
-        print('把预测结果保存在-->', forecast_result_saved_path)
-        with open(forecast_result_saved_path , 'wb') as fp:
-            pickle.dump(sample_forecasts , fp)
+            
+    prediction['label'] = prediction['label'].astype(int)
+    prediction.to_csv('output/arima_train_{}_diff_{}_noBoxCox.csv'.format(past,use_diff),index=False)
+            
 
 
     
