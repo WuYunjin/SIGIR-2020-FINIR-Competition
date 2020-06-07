@@ -134,5 +134,8 @@ dmypy.json
 *.png
 *.pkl
 
+# output of our model
+output/
+
 #vscode
 .vscode
