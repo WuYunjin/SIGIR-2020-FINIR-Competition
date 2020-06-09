@@ -1,7 +1,7 @@
 from Validation_60d import val as val_60
 from Validation_20d import val as val_20
 from Validation_1d import val as val_1
-from diff import pseudo_label
+
 import pandas as pd
 import time
 
@@ -9,7 +9,6 @@ time_start=time.time()
 
 print("Start Now....")
 
-pseudo_label()
 
 prediction = pd.DataFrame()
 prediction['id'] = []

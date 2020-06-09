@@ -110,7 +110,7 @@ def val():
         flag = 1
         y_pred_all = np.array([])
         
-        result = pd.read_csv('leak_result.csv')
+        result = pd.read_csv('result_93.58.csv')
         prefix = valfiles_oi[ind].split('_')[0]+'-validation-20d'
         while(flag):
                 if(window_end <= valdata_len):

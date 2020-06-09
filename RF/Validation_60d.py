@@ -64,17 +64,35 @@ def feature_extract(traindata_len,ind):
 
         # Construct new features         
         all_data['Price_diff_1'] = all_data['Close.Price'].diff(1)
+        all_data['NKY_diff_1'] = all_data['NKY'].diff(1)
+        all_data['SHSZ300_diff_1'] = all_data['SHSZ300'].diff(1)
+        all_data['SPX_diff_1'] = all_data['SPX'].diff(1)
+        all_data['SX5E_diff_1'] = all_data['SX5E'].diff(1)
+        all_data['UKX_diff_1'] = all_data['UKX'].diff(1)
+        all_data['VIX_diff_1'] = all_data['VIX'].diff(1)
+        all_data['Volume_diff_1'] = all_data['Volume'].diff(1)
+
         all_data['Price_diff_5'] = all_data['Close.Price'].diff(5)
+        all_data['NKY_diff_5'] = all_data['NKY'].diff(5)
+
         all_data['Price_diff_10'] = all_data['Close.Price'].diff(10)
+        all_data['NKY_diff_10'] = all_data['NKY'].diff(10)
+
         all_data['Price_diff_15'] = all_data['Close.Price'].diff(15)
+        all_data['NKY_diff_15'] = all_data['NKY'].diff(15)
+
         all_data['Price_diff_20'] = all_data['Close.Price'].diff(20)
+        all_data['NKY_diff_20'] = all_data['NKY'].diff(20)
+
+        all_data['Price_diff_30'] = all_data['Close.Price'].diff(30)
+        all_data['NKY_diff_30'] = all_data['NKY'].diff(30)
 
         data = all_data[-traindata_len-253:] #253 is the length of validation set
         return data
 
 
 def train_rf(feature,label):
-        rf =  RandomForestClassifier(random_state=10,n_estimators=10)
+        rf =  RandomForestClassifier(random_state=10,n_estimators=30)
         rf.fit(feature,label)
                 
         # y_pred = rf.predict(feature)
@@ -99,18 +117,18 @@ def val():
     accuracy = 0    
     for ind in range(6):
 
-        traindata_len = 60 # window_size 
+        traindata_len = 300 # window_size to train
         data = feature_extract(traindata_len,ind=ind)
 
         window_start = traindata_len +253
         window_end = 253
 
-        valdata_len = 60  # accuracy will achieve 84 when valdata_len = 1, but seems will be data leak...
+        valdata_len = 1  
 
         flag = 1
         y_pred_all = np.array([])
         
-        result = pd.read_csv('leak_result.csv')
+        result = pd.read_csv('result_93.58.csv')
         prefix = valfiles_oi[ind].split('_')[0]+'-validation-60d'
         while(flag):
                 if(window_end <= valdata_len):
@@ -128,25 +146,27 @@ def val():
                         val_data = data[-window_end:]
                 val_feature = val_data[val_data.columns.difference(['label'])]
         
-                y_pred = rf.predict(val_feature)
+                y_pred = rf.predict_proba(val_feature)[:,1]
+                y_pred[y_pred>0.8]=1
+                y_pred[y_pred<=0.8]=0
                 y_pred_all = np.append(y_pred_all,y_pred)
 
                 if(flag):
-                        val_label  = result.loc[result['id'].str.contains(prefix)][-window_end:-window_end+valdata_len]
-                        data.loc[-window_end:-window_end+valdata_len,'label'] = val_label['label'].values #y_pred
-                else:
-                        val_label  = result.loc[result['id'].str.contains(prefix)][-window_end:]                        
-                        data.loc[-window_end:,'label'] = val_label['label'].values #y_pred
-                # print(np.mean(val_label['label']==y_pred))
+                        data.loc[-window_end:-window_end+valdata_len,'label'] = y_pred
+                else:                     
+                        data.loc[-window_end:,'label'] = y_pred
 
 
                 window_start -= valdata_len
                 window_end -= valdata_len
-
+        acc = np.mean(result.loc[result['id'].str.contains(prefix)][-253:]['label'].values==y_pred_all)
+        accuracy += acc
+        print("accuracy: ",acc)
         
-        temp = pd.DataFrame({'id':result[result['id'].str.contains(prefix)]['id'],'label':y_pred_all})
+        temp = pd.DataFrame({'id':prefix+'-'+data[-253:].index,'label':y_pred_all})
 
         prediction = prediction.append(temp)
+    print("Average accuracy:",accuracy/6)
 
     return prediction
 
