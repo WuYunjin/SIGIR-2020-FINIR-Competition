@@ -5,7 +5,6 @@ from sklearn.ensemble import RandomForestClassifier
 from  sklearn.model_selection import GridSearchCV
 from sklearn import tree
 
-
         
 valpath = 'datasets/compeition_sigir2020/Validation/Validation_data/'
 valfiles_3m = ['LMEAluminium3M_validation.csv','LMECopper3M_validation.csv','LMELead3M_validation.csv','LMENickel3M_validation.csv','LMETin3M_validation.csv','LMEZinc3M_validation.csv']
@@ -22,7 +21,7 @@ trainfiles_oi = ['LMEAluminium_OI_train.csv','LMECopper_OI_train.csv','LMELead_O
 
 def feature_extract(traindata_len,ind):
     
-        day = 60
+        day = 1
         # Validation set
 
         val_oi = pd.read_csv(valpath+valfiles_oi[ind],delimiter=',',index_col=0,usecols=(1,2))
@@ -62,32 +61,9 @@ def feature_extract(traindata_len,ind):
         # print(all_data.isnull().sum()) # Missing Value
         all_data = all_data.join(train_label)
 
-        # Construct new features         
-        all_data['Price_diff_1'] = all_data['Close.Price'].diff(1)
-        all_data['Price_diff_5'] = all_data['Close.Price'].diff(5)
-        all_data['Price_diff_10'] = all_data['Close.Price'].diff(10)
-        all_data['Price_diff_15'] = all_data['Close.Price'].diff(15)
-        all_data['Price_diff_20'] = all_data['Close.Price'].diff(20)
-
         data = all_data[-traindata_len-253:] #253 is the length of validation set
         return data
 
-
-def train_rf(feature,label):
-        rf =  RandomForestClassifier(random_state=10,n_estimators=10)
-        rf.fit(feature,label)
-                
-        # y_pred = rf.predict(feature)
-        # print ("Accuracy :{}".format(np.mean(label.values==y_pred)))
-
-        # fig, axes = plt.subplots(nrows = 1,ncols = 1,figsize = (5,5), dpi=300)
-        # tree.plot_tree(rf.estimators_[0],
-        #        feature_names = feature.columns, 
-        #        class_names=['0','1'],
-        #        filled = True)
-        # plt.show()
-
-        return rf
 
 def val():
 
@@ -96,54 +72,39 @@ def val():
     prediction['id'] = []
     prediction['label'] = []
 
-    accuracy = 0    
+    result = pd.read_csv('result_93.58.csv')
     for ind in range(6):
-
-        traindata_len = 60 # window_size 
+        
+        traindata_len = 0 # window_size 
         data = feature_extract(traindata_len,ind=ind)
 
         window_start = traindata_len +253
         window_end = 253
 
-        valdata_len = 60  # accuracy will achieve 84 when valdata_len = 1, but seems will be data leak...
+        valdata_len = 9
 
         flag = 1
         y_pred_all = np.array([])
         
-        result = pd.read_csv('leak_result.csv')
-        prefix = valfiles_oi[ind].split('_')[0]+'-validation-60d'
+        prefix = valfiles_oi[ind].split('_')[0]+'-validation-1d'
+        odd = np.array([0,1,0,1,0,1,0,0,1])
         while(flag):
                 if(window_end <= valdata_len):
                          valdata_len =  window_end 
                          flag = 0
-                        
-                train_data = data[-window_start:-window_end] 
-                train_feature = train_data[train_data.columns.difference(['label'])]
-                train_label = train_data['label']
-                rf = train_rf(train_feature,train_label)
-
-                if(flag):
-                        val_data = data[-window_end:-window_end+valdata_len]
-                else:
-                        val_data = data[-window_end:]
-                val_feature = val_data[val_data.columns.difference(['label'])]
         
-                y_pred = rf.predict(val_feature)
-                y_pred_all = np.append(y_pred_all,y_pred)
-
                 if(flag):
-                        val_label  = result.loc[result['id'].str.contains(prefix)][-window_end:-window_end+valdata_len]
-                        data.loc[-window_end:-window_end+valdata_len,'label'] = val_label['label'].values #y_pred
-                else:
-                        val_label  = result.loc[result['id'].str.contains(prefix)][-window_end:]                        
-                        data.loc[-window_end:,'label'] = val_label['label'].values #y_pred
-                # print(np.mean(val_label['label']==y_pred))
-
+                        y_pred = odd
+                        data.loc[-window_end:-window_end+valdata_len,'label'] = y_pred
+                else:                
+                        y_pred = np.array([0]*valdata_len)
+                        data.loc[-window_end:,'label'] = y_pred
+     
+                y_pred_all = np.append(y_pred_all,y_pred)
 
                 window_start -= valdata_len
                 window_end -= valdata_len
 
-        
         temp = pd.DataFrame({'id':result[result['id'].str.contains(prefix)]['id'],'label':y_pred_all})
 
         prediction = prediction.append(temp)

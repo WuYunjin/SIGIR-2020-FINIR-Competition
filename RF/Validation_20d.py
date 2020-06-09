@@ -22,7 +22,7 @@ trainfiles_oi = ['LMEAluminium_OI_train.csv','LMECopper_OI_train.csv','LMELead_O
 
 def feature_extract(traindata_len,ind):
     
-        day = 60
+        day = 20
         # Validation set
 
         val_oi = pd.read_csv(valpath+valfiles_oi[ind],delimiter=',',index_col=0,usecols=(1,2))
@@ -63,11 +63,11 @@ def feature_extract(traindata_len,ind):
         all_data = all_data.join(train_label)
 
         # Construct new features         
-        all_data['Price_diff_1'] = all_data['Close.Price'].diff(1)
-        all_data['Price_diff_5'] = all_data['Close.Price'].diff(5)
-        all_data['Price_diff_10'] = all_data['Close.Price'].diff(10)
-        all_data['Price_diff_15'] = all_data['Close.Price'].diff(15)
-        all_data['Price_diff_20'] = all_data['Close.Price'].diff(20)
+        # all_data['Price_diff_1'] = all_data['Close.Price'].diff(1)
+        # all_data['Price_diff_5'] = all_data['Close.Price'].diff(5)
+        # all_data['Price_diff_10'] = all_data['Close.Price'].diff(10)
+        # all_data['Price_diff_15'] = all_data['Close.Price'].diff(15)
+        # all_data['Price_diff_20'] = all_data['Close.Price'].diff(20)
 
         data = all_data[-traindata_len-253:] #253 is the length of validation set
         return data
@@ -99,19 +99,19 @@ def val():
     accuracy = 0    
     for ind in range(6):
 
-        traindata_len = 60 # window_size 
+        traindata_len = 90 # window_size 
         data = feature_extract(traindata_len,ind=ind)
 
         window_start = traindata_len +253
         window_end = 253
 
-        valdata_len = 60  # accuracy will achieve 84 when valdata_len = 1, but seems will be data leak...
+        valdata_len = 20  # accuracy will achieve 84 when valdata_len = 1, but seems will be data leak...
 
         flag = 1
         y_pred_all = np.array([])
         
         result = pd.read_csv('leak_result.csv')
-        prefix = valfiles_oi[ind].split('_')[0]+'-validation-60d'
+        prefix = valfiles_oi[ind].split('_')[0]+'-validation-20d'
         while(flag):
                 if(window_end <= valdata_len):
                          valdata_len =  window_end 
@@ -137,13 +137,11 @@ def val():
                 else:
                         val_label  = result.loc[result['id'].str.contains(prefix)][-window_end:]                        
                         data.loc[-window_end:,'label'] = val_label['label'].values #y_pred
-                # print(np.mean(val_label['label']==y_pred))
-
+                
 
                 window_start -= valdata_len
                 window_end -= valdata_len
 
-        
         temp = pd.DataFrame({'id':result[result['id'].str.contains(prefix)]['id'],'label':y_pred_all})
 
         prediction = prediction.append(temp)
