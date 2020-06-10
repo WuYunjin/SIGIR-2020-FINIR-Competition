@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 
-for i in [60]:
+for i in [1,20,60]:
 
     # for ind in['LMEAluminium','LMECopper','LMELead','LMENickel','LMETin','LMEZinc']:
 

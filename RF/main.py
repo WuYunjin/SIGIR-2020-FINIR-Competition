@@ -7,13 +7,14 @@ import time
 
 time_start=time.time()
 
-print("Start Now....")
+print("Start Now，will take few minutes")
 
 
 prediction = pd.DataFrame()
 prediction['id'] = []
 prediction['label'] = []
 
+print("Predicting 60day ....")
 prediction = prediction.append( val_60() )
 
 prediction = prediction.append( val_20() )
