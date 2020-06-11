@@ -9,14 +9,15 @@ from torch import nn, optim
 import pandas as pd
 import numpy as np
 import os
+from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler
 
 
 torch.manual_seed(1234)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-from sklearn.preprocessing import MinMaxScaler
-sc = MinMaxScaler()
+
+
 
 class LSTM(nn.Module):
     def __init__(self, n_input, num_layers,n_hidden, n_output):
@@ -25,6 +26,8 @@ class LSTM(nn.Module):
         self.rnn = nn.LSTM(n_input,n_hidden,num_layers , batch_first=True)
         
         self.out = nn.Linear(n_hidden, n_output)
+
+        self.sigmoid = nn.Sigmoid()
     def init_weight(self):
         for param in self.parameters():
             if len(param.shape) > 1:
@@ -40,30 +43,65 @@ class LSTM(nn.Module):
         output ,(cn ,hn) = self.rnn(x)
         x = torch.relu(output)  # activation function for hidden layer
         x = self.out(x)[:,-1]
-
+        # x = self.sigmoid(x)
         return x
 
 
-def loss_function(pred_y,y):
+def loss_mse(pred_y,y,x):
     criteria = nn.MSELoss()
     loss = criteria(pred_y,y)  
     return loss
 
+def loss_2(pred_y , y , x):
+    loss = torch.sign(y-x)*(y-pred_y)
+    loss = torch.mean(loss)
+    return loss
+
+def loss_diff(pred_y , y , x):
+    loss = torch.sign(y)*(-pred_y)
+    loss = torch.mean(loss)
+    return loss
+
+def loss_bce(pred_y , y , x):
+    label = torch.where(y-x>0, torch.ones_like(y) , torch.zeros_like(y))
+    criteria = nn.BCELoss()
+    loss = criteria(pred_y , label)
+    return loss
+
+def get_label(y_pre , y_pred):
+    label = 1 if y_pred > y_pre else 0;
+    return label
+
+def get_label_diff(y_pre,y_pred):
+    label = 1 if y_pred>0 else 0;
+    return label
+
+def get_label_sigmoid(y_pred):
+    label = 1 if y_pred > 0.5 else 0;
+    return label
+
 
 class myDataset(Dataset):
-    def __init__(self, filepath, train_day ,day , flag):
+    def __init__(self, filepath, train_day ,day , flag , use_diff):
         # filepath: List[string], path of data ,subscript [0] for training , subscript [1] for validation
         # train_day : int , try to model an LSTM with train_day ,which is specified
         # day: int, try to predict T+day, day is 1 or 20 or 60.
         # flag: string, 'train' or 'test' or 'Validation' , to split the whole dataset
+        # use_diff : whether to diff the origin dataset
         self.flag = flag;
         if flag == 'train':
             train_3m = pd.read_csv(filepath[0],delimiter=',',index_col=0,usecols=(1,5))
             val_3m = pd.read_csv(filepath[1],delimiter=',',index_col=0,usecols=(1,5))
             data = train_3m.append(val_3m)
+            sc = MinMaxScaler()
 
-            x =  data[-val_3m.shape[0]-1011-train_day+1:-day].values # Price from 2014-1-2 to 2017-12-29
-            y = data[-val_3m.shape[0]-1011+day:].values  # Price from 2014-1-2+day to 2017-12-29+day
+            if use_diff:
+                data = data.diff(1)
+                sc = MaxAbsScaler()
+
+
+            x =  data[-val_3m.shape[0]-500-train_day+1:-day].values # Price from 2014-1-2 to 2017-12-29
+            y = data[-val_3m.shape[0]-500+day:].values  # Price from 2014-1-2+day to 2017-12-29+day
             sc.fit(x)
             x = np.reshape(x,(-1,1)) # For scaling
             x = sc.transform(x)
@@ -72,11 +110,22 @@ class myDataset(Dataset):
             y = np.reshape(y,(-1,1)) # For scaling
             y = sc.transform(y)
 
+            # if use_diff:
+            #     x = np.diff(x,axis=0)
+            #     y = np.diff(y,axis=0)
+
+
         elif flag == 'test':
             train_3m = pd.read_csv(filepath[0],delimiter=',',index_col=0,usecols=(1,5))
             val_3m = pd.read_csv(filepath[1],delimiter=',',index_col=0,usecols=(1,5))
             data = train_3m.append(val_3m)
+            sc = MinMaxScaler()
             
+            if use_diff:
+                data = data.diff(1)
+                sc = MaxAbsScaler()
+
+
             x = data[train_3m.shape[0]-train_day : ].values # Price from 2014-1-2 to 2017-12-29
             y = data[train_3m.shape[0]:].values # used for the previous point
             sc.fit(x)
@@ -87,9 +136,14 @@ class myDataset(Dataset):
             
             y = np.reshape(y,(-1,1)) # For scaling
             y = sc.transform(y)
-            
-            
 
+            # if use_diff:
+            #     x = np.diff(x,axis=0)
+            #     y = np.diff(y,axis=0)
+
+
+            
+        
         
         else:
             print('输入的flag不符合逻辑')
@@ -113,14 +167,15 @@ class myDataset(Dataset):
             return x ,y_pre
           
 
-def train(epochs,model, metal, day):
+def train(epochs,model, metal, day, add_epoch , loss_func):
     # metal : what kind of metal
     # day:  1 or 20 or 60.
     L = []
     y1 = np.array([])
     y2 = np.array([])
     best_loss = float('inf')
-    for epoch in range(1, epochs +1):
+    epoch = 1
+    while epoch < epochs+1:
         model.train()
         train_loss = 0
         for batch_idx, (x,y) in enumerate(train_loader):
@@ -129,7 +184,7 @@ def train(epochs,model, metal, day):
             optimizer.zero_grad()
             pred_y = model(x) #(bs,output)
 
-            loss = loss_function(pred_y.squeeze(-1),y)
+            loss = loss_func(pred_y.squeeze(-1),y,x.squeeze()[:,-1])
             loss.backward()
             train_loss += loss.item()
             optimizer.step()
@@ -139,15 +194,22 @@ def train(epochs,model, metal, day):
                 y2 = np.append(y2,pred_y.detach().cpu().numpy())
 
         epoch_loss = train_loss / len(train_loader.dataset)
-        if epoch % 10 == 0:
+        if epoch % 3 == 0:
                 print('====> Epoch: {} Average loss: {:.4f}'.format(
                 epoch, epoch_loss ))
+                if add_epoch and epoch == epochs and epoch_loss > 0:
+                    epochs += 10
+                    
         if epoch_loss < best_loss:
             best_loss = epoch_loss
         L.append(train_loss / len(train_loader.dataset))
 
-    import matplotlib.pyplot as plt 
+        epoch += 1
 
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt 
+    
     plt.plot(y1,label='real',color='blue')
     plt.plot(y2,label='pred',color='red')
     plt.legend()
@@ -156,7 +218,7 @@ def train(epochs,model, metal, day):
     return model 
 
 
-def test(model, metal, day):
+def test(model, metal, day , label_gen):
     model.eval()
     test_result = pd.DataFrame();
     test_result['id'] = []
@@ -170,68 +232,17 @@ def test(model, metal, day):
             pred_y = model(x)
             pred_y = pred_y.squeeze(-1).cpu().numpy()[-1]
             y_pre = y_pre.cpu().numpy()[-1]
-            label = 1 if pred_y > y_pre else 0;
+            label = label_gen(y_pre , pred_y);
+
             idx = prefix + date.iloc[i]
             test_result = test_result.append({'id':idx , 'label':label},ignore_index=True)
     return test_result
-            
 
-def val(model,data,day,label):
+def val(pred,label,prefix):
     
-    pred_price = pd.DataFrame([],index=data.index,columns=['price'])
-    temp = np.array([])
-
-
-    for ind,x in enumerate(data.values):        
-        model.eval()
-        with torch.no_grad():
-            
-            x = torch.tensor(x).float().to(device)
-            pred_y = model(x).numpy()
-            if( ind+day >= len(data.values)): 
-                temp = np.append(temp,pred_y)
-            else:
-                pred_price['price'].iloc[ind+day] = pred_y
-        
-        
-        # Update the model with the new instance.
-        if( ind+day < len(data.values)): 
-            model.train()
-            new_x = data.values[ind]
-            new_x = np.reshape(new_x,(-1,1))
-            new_x = sc.transform(new_x)
-            new_x = torch.tensor(new_x).float().to(device)
-
-            new_y = data.values[ind+day]
-            new_y = np.reshape(new_y,(-1,1)) # For scaling
-            new_y = sc.transform(new_y)
-            new_y = torch.tensor(new_y).float().to(device)
-
-            optimizer.zero_grad()
-            y1 = model(new_x)
-            loss = loss_function(y1,new_y)
-            loss.backward()
-            optimizer.step()
-
-
-                
-    pred_price = pred_price.append(pd.DataFrame(temp,columns=['price']))[day:]
-    
-
-
-    pred_label = pd.DataFrame([],index=data.index[day:],columns=['label'])
-
-    for ind,x in enumerate(pred_price['price'][:-day].values):
-        if( x < pred_price['price'].iloc[ind+day] ):
-            pred_label['label'].iloc[ind] = 1
-        else:
-            pred_label['label'].iloc[ind] = 0
-
-        
-    accuracy = (pred_label.values==label)['label'].value_counts()
-    print(accuracy)
-
-
+    accuracy = (pred.values==label)['label'].value_counts()
+    acc = accuracy[True]/ (accuracy[True] + accuracy[False])
+    print(prefix , '的准确率如下：' , acc)
 
 trainpath = 'datasets/compeition_sigir2020/Train/Train_data'
 valpath = 'datasets/compeition_sigir2020/Validation/Validation_data'
@@ -242,7 +253,9 @@ valfiles_3m = ['LMEAluminium3M_validation.csv','LMECopper3M_validation.csv','LME
 seq_length = 22 
 n_hidden = 4
 num_layers = 2
-epoches = 500
+epoches = 9
+add_epoch = False; # 是否要根据条件添加 epoch
+use_diff = False;
 train_output = 'output/train_loss/mlp' #命名以 model 进行命名
 if not os.path.exists(train_output):
     os.makedirs(train_output)
@@ -250,14 +263,15 @@ if not os.path.exists(train_output):
 prediction = pd.DataFrame()
 prediction['id'] = []
 prediction['label'] = []
+result = pd.read_csv('result_93.58.csv')
 for ind in range(len(trainfiles_3m)):
     for i in [1,20,60]:
         # The train_data doesn't split training set and test set, so we do it manually by pass a string parameter.
         train_file = os.path.join(trainpath , trainfiles_3m[ind])
         val_file = os.path.join(valpath , valfiles_3m[ind])
         
-        train_data  =  myDataset([train_file,val_file], seq_length ,i ,'train')
-        test_data  =  myDataset([train_file, val_file], seq_length ,i, 'test')
+        train_data  =  myDataset([train_file,val_file], seq_length ,i ,'train' , use_diff)
+        test_data  =  myDataset([train_file, val_file], seq_length ,i, 'test' , use_diff)
 
         train_loader = DataLoader(dataset=train_data, batch_size=10, shuffle=False)
         test_loader = DataLoader(dataset=test_data, batch_size=1, shuffle=False)
@@ -266,16 +280,22 @@ for ind in range(len(trainfiles_3m)):
         rnn.init_weight() # 增加初始化
         optimizer = optim.SGD(rnn.parameters(), lr=0.001)
 
-        rnn = train(epochs=epoches, model = rnn, metal=trainfiles_3m[ind], day=i)
-        label_pred = test(model=rnn,metal=val_file , day=i)
+        rnn = train(epochs=epoches, model = rnn, metal=trainfiles_3m[ind], day=i , add_epoch = add_epoch ,loss_func=loss_2 )
+        label_pred = test(model=rnn,metal=val_file , day=i ,label_gen = get_label)
+
+        
+        prefix = valfiles_3m[ind].split('_')[0].strip('3M')+'-validation-'+str(i)+'d'
+        label  = result.loc[result['id'].str.contains(prefix)]
+        val(pred=label_pred,label=label,prefix=prefix)
+
         prediction = prediction.append(label_pred)
         
         # torch.save(mlp,'E:/BaiduNetdiskDownload/compeition_sigir2020/%sday_%s_model'%(i,trainfiles_3m[ind].split('_')[0].strip('3M')))
         
 
-        # break
-    # break
-prediction = pd.read_csv('output/lstm_layers_2_hidden_4.csv')
+    
 prediction['label'] = prediction['label'].astype(int)
-prediction.to_csv('output/lstm_layers_{}_hidden_{}_int.csv'.format(num_layers , n_hidden),index=False)
-# prediction.to_csv('output/lstm_layers_{}_hidden_{}.csv'.format(num_layers , n_hidden),index=False)
+accuracy = (prediction.values==result)['label'].value_counts()
+acc = accuracy[True]/ (accuracy[True] + accuracy[False])
+print('的准确率如下：' , acc)
+prediction.to_csv('output/lstm_seq_{}_layers_{}_hidden_{}_epoch_{}__new_loss.csv'.format(seq_length,num_layers , n_hidden , epoches),index=False)
