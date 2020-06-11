@@ -5,6 +5,8 @@ from sklearn.ensemble import RandomForestClassifier
 from  sklearn.model_selection import GridSearchCV
 from sklearn import tree
 
+from talib.abstract import *
+
 
         
 valpath = 'datasets/compeition_sigir2020/Validation/Validation_data/'
@@ -24,18 +26,7 @@ def feature_extract(traindata_len,ind):
     
         day = 1
         # Validation set
-
-        val_oi = pd.read_csv(valpath+valfiles_oi[ind],delimiter=',',index_col=0,usecols=(1,2))
-        val_3m = pd.read_csv(valpath+valfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,5,6))#usecols=(1,2,3,4,5,6))
-
-        val_nky = pd.read_csv(valpath+valfiles_indices[0],delimiter=',',index_col=0,usecols=(1,2))
-        val_shsz300 = pd.read_csv(valpath+valfiles_indices[1],delimiter=',',index_col=0,usecols=(1,2))        
-        val_spx = pd.read_csv(valpath+valfiles_indices[2],delimiter=',',index_col=0,usecols=(1,2))
-        val_sx5e = pd.read_csv(valpath+valfiles_indices[3],delimiter=',',index_col=0,usecols=(1,2))
-        val_ukx = pd.read_csv(valpath+valfiles_indices[4],delimiter=',',index_col=0,usecols=(1,2))
-        val_vix = pd.read_csv(valpath+valfiles_indices[5],delimiter=',',index_col=0,usecols=(1,2))
-
-        val_data = val_oi.join(val_3m).join(val_nky).join(val_shsz300).join(val_spx).join(val_sx5e).join(val_ukx).join(val_vix) 
+        val_3m = pd.read_csv(valpath+valfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,2,3,4,5,6),names=['Index','open','high','low','close','volume'],skiprows=1)
 
 
         #Trainning set
@@ -43,73 +34,35 @@ def feature_extract(traindata_len,ind):
         suffix = 'Label_'+trainfiles_3m[ind].split('_')[0].strip('3M')+'_train_'+str(day)+'d.csv'
         train_label  = pd.read_csv(trainpath+suffix,delimiter=',',index_col=0,usecols=(1,2),names=['date','label'],skiprows=1)
 
-            
-        train_oi = pd.read_csv(trainpath+trainfiles_oi[ind],delimiter=',',index_col=0,usecols=(1,2))
-        train_3m = pd.read_csv(trainpath+trainfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,5,6))#usecols=(1,2,3,4,5,6))
+        train_3m = pd.read_csv(trainpath+trainfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,2,3,4,5,6),names=['Index','open','high','low','close','volume'],skiprows=1)
 
-        train_nky = pd.read_csv(trainpath+trainfiles_indices[0],delimiter=',',index_col=0,usecols=(1,2))
-        train_shsz300 = pd.read_csv(trainpath+trainfiles_indices[1],delimiter=',',index_col=0,usecols=(1,2))        
-        train_spx = pd.read_csv(trainpath+trainfiles_indices[2],delimiter=',',index_col=0,usecols=(1,2))
-        train_sx5e = pd.read_csv(trainpath+trainfiles_indices[3],delimiter=',',index_col=0,usecols=(1,2))
-        train_ukx = pd.read_csv(trainpath+trainfiles_indices[4],delimiter=',',index_col=0,usecols=(1,2))
-        train_vix = pd.read_csv(trainpath+trainfiles_indices[5],delimiter=',',index_col=0,usecols=(1,2))
-
-        train_data = train_oi.join(train_3m).join(train_nky).join(train_shsz300).join(train_spx).join(train_sx5e).join(train_ukx).join(train_vix) 
-        
-        all_data = pd.concat([train_data,val_data])
+        all_data = pd.concat([train_3m,val_3m])
         # print(all_data.isnull().sum()) # Missing Value
-        all_data.fillna(method='ffill',inplace=True)
+        # all_data.fillna(method='ffill',inplace=True)
         # print(all_data.isnull().sum()) # Missing Value
-        all_data = all_data.join(train_label)
 
         # Construct new features         
-        all_data['Price_diff_1'] = all_data['Close.Price'].diff(1)
-        all_data['NKY_diff_1'] = all_data['NKY'].diff(1)
-        all_data['SHSZ300_diff_1'] = all_data['SHSZ300'].diff(1)
-        all_data['SPX_diff_1'] = all_data['SPX'].diff(1)
-        all_data['SX5E_diff_1'] = all_data['SX5E'].diff(1)
-        all_data['UKX_diff_1'] = all_data['UKX'].diff(1)
-        all_data['VIX_diff_1'] = all_data['VIX'].diff(1)
-        all_data['Volume_diff_1'] = all_data['Volume'].diff(1)
+        
+        all_data['sma_10'] = pd.DataFrame(SMA(all_data, timeperiod=10))
+        all_data['mom_10'] = pd.DataFrame(MOM(all_data,10))
+        all_data['wma_10'] = pd.DataFrame(WMA(all_data,10))
+        all_data = pd.concat([all_data,STOCHF(all_data, 
+                                          fastk_period=14, 
+                                          fastd_period=3)],
+                             axis=1)
+ 
+        all_data['macd'] = pd.DataFrame(MACD(all_data, fastperiod=12, slowperiod=26)['macd'])
+        all_data['rsi'] = pd.DataFrame(RSI(all_data, timeperiod=14))
+        all_data['willr'] = pd.DataFrame(WILLR(all_data, timeperiod=14))
+        all_data['cci'] = pd.DataFrame(CCI(all_data, timeperiod=14))
+        
+        all_data['pct_change_20'] = ROC(all_data, timeperiod=20)
+        all_data['pct_change_30'] = ROC(all_data, timeperiod=30)
+        all_data['pct_change_60'] = ROC(all_data, timeperiod=60)
 
-        all_data['Price_diff_5'] = all_data['Close.Price'].diff(5)
-        all_data['NKY_diff_5'] = all_data['NKY'].diff(5)
-        all_data['SHSZ300_diff_5'] = all_data['SHSZ300'].diff(5)
-        all_data['SPX_diff_5'] = all_data['SPX'].diff(5)
-        all_data['SX5E_diff_5'] = all_data['SX5E'].diff(5)
-        all_data['UKX_diff_5'] = all_data['UKX'].diff(5)
-        all_data['VIX_diff_5'] = all_data['VIX'].diff(5)
-        all_data['Volume_diff_5'] = all_data['Volume'].diff(5)
+        all_data.dropna(inplace=True)
 
-        all_data['Price_diff_10'] = all_data['Close.Price'].diff(10)
-        all_data['NKY_diff_10'] = all_data['NKY'].diff(10)
-        all_data['SHSZ300_diff_10'] = all_data['SHSZ300'].diff(10)
-        all_data['SPX_diff_10'] = all_data['SPX'].diff(10)
-        all_data['SX5E_diff_10'] = all_data['SX5E'].diff(10)
-        all_data['UKX_diff_10'] = all_data['UKX'].diff(10)
-        all_data['VIX_diff_10'] = all_data['VIX'].diff(10)
-        all_data['Volume_diff_10'] = all_data['Volume'].diff(10)
-
-
-        all_data['Price_diff_15'] = all_data['Close.Price'].diff(15)
-        all_data['NKY_diff_15'] = all_data['NKY'].diff(15)
-        all_data['SHSZ300_diff_15'] = all_data['SHSZ300'].diff(15)
-        all_data['SPX_diff_15'] = all_data['SPX'].diff(15)
-        all_data['SX5E_diff_15'] = all_data['SX5E'].diff(15)
-        all_data['UKX_diff_15'] = all_data['UKX'].diff(15)
-        all_data['VIX_diff_15'] = all_data['VIX'].diff(15)
-        all_data['Volume_diff_15'] = all_data['Volume'].diff(15)
-
-
-        all_data['Price_diff_20'] = all_data['Close.Price'].diff(20)
-        all_data['NKY_diff_20'] = all_data['NKY'].diff(20)
-        all_data['SHSZ300_diff_20'] = all_data['SHSZ300'].diff(20)
-        all_data['SPX_diff_20'] = all_data['SPX'].diff(20)
-        all_data['SX5E_diff_20'] = all_data['SX5E'].diff(20)
-        all_data['UKX_diff_20'] = all_data['UKX'].diff(20)
-        all_data['VIX_diff_20'] = all_data['VIX'].diff(20)
-        all_data['Volume_diff_20'] = all_data['Volume'].diff(20)
-
+        all_data = all_data.join(train_label)
         data = all_data[-traindata_len-253:] #253 is the length of validation set
         return data
 
@@ -146,7 +99,7 @@ def val():
         window_start = traindata_len +253
         window_end = 253
 
-        valdata_len = 30  
+        valdata_len = 25 
 
         flag = 1
         y_pred_all = np.array([])
@@ -170,8 +123,8 @@ def val():
                 val_feature = val_data[val_data.columns.difference(['label'])]
         
                 y_pred = rf.predict_proba(val_feature)[:,1]
-                y_pred[y_pred>=0.6]=1
-                y_pred[y_pred<0.6]=0
+                y_pred[y_pred>0.6]=1
+                y_pred[y_pred<=0.6]=0
                 y_pred_all = np.append(y_pred_all,y_pred)
 
                 if(flag):
