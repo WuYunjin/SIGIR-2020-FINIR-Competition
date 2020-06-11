@@ -24,9 +24,8 @@ trainfiles_oi = ['LMEAluminium_OI_train.csv','LMECopper_OI_train.csv','LMELead_O
 trainfiles_3m = ['LMEAluminium3M_train.csv','LMECopper3M_train.csv','LMELead3M_train.csv','LMENickel3M_train.csv','LMETin3M_train.csv','LMEZinc3M_train.csv']
 
 # 是否将原始数据进行差分
-use_diff = False
+use_diff = True
 prediction = pd.DataFrame()
-timestep = 1303 # to the day of 2018-12-31
 past = 264 
 slice_style = 'overlap'
 ds_name_prefix = 'data_process/processed_data/{}_{}_{}_{}.pkl'
@@ -52,7 +51,7 @@ if __name__ == '__main__':
             
             prefix = valfiles_oi[ind].split('_')[0]+'-validation-{}d-'.format(pred)
             #滑动窗口
-            for i in range(past+pred-1, len(data)):
+            for i in range(past+pred-1, len(price)):
                 print('===========当前训练的是{}数据集，目标节点是{}=================='.format(
                     valfiles_oi[ind].split('_')[0] , val_3m.index[(i - (past+pred) + 1)]))
                 sample = price[(i - (past+pred) + 1):(i + 1)]
@@ -75,8 +74,6 @@ if __name__ == '__main__':
                 else:
                     val_label = 1 if pred_result[-1] - train[-1] > 0 else 0
                 prediction = prediction.append({'id':val_index , 'label':val_label} , ignore_index=True)
-
-                
             
     prediction['label'] = prediction['label'].astype(int)
     prediction.to_csv('output/arima_train_{}_diff_{}_noBoxCox.csv'.format(past,use_diff),index=False)

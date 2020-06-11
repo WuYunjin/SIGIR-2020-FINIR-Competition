@@ -98,7 +98,7 @@ def slice_df_overlap(
     :param dataframe:  给定需要滑动切片的总数据集
     :param window_size:  窗口的大小
     :param past_size:  训练的窗口大小
-    :return: (1)序列开始的时间 List[start_time] (2) 切片后的序列
+    :return:  (2) 切片后的序列 (2)序列开始的时间 List[start_time] (3) 序列开始预测的时间
     '''
     data = dataframe.values
     timestamp = dataframe.index

@@ -109,8 +109,8 @@ def train(epochs,model, metal, day):
             optimizer.step()
             
             if epoch == epochs:
-                y1 = np.append(y1,y.detach().numpy())
-                y2 = np.append(y2,pred_y.detach().numpy())
+                y1 = np.append(y1,y.detach().cpu().numpy())
+                y2 = np.append(y2,pred_y.detach().cpu().numpy())
 
         epoch_loss = train_loss / len(train_loader.dataset)
         if epoch % 10 == 0:
@@ -133,28 +133,28 @@ def train(epochs,model, metal, day):
     return model 
 
 
-def test(model, metal, day):
-    model.eval()
-    test_loss = 0
-    y1 = np.array([])
-    y2 = np.array([])
-    with torch.no_grad():
-        for batch_idx, (x,y) in enumerate(test_loader):
-            x = x.to(device)
-            pred_y = model(x)
-            loss = loss_function(pred_y,y)
-            test_loss += loss
+# def test(model, metal, day):
+#     model.eval()
+#     test_loss = 0
+#     y1 = np.array([])
+#     y2 = np.array([])
+#     with torch.no_grad():
+#         for batch_idx, (x,y) in enumerate(test_loader):
+#             x = x.to(device)
+#             pred_y = model(x)
+#             loss = loss_function(pred_y,y)
+#             test_loss += loss
                 
-            y1 = np.append(y1,y.numpy())
-            y2 = np.append(y2,pred_y.numpy())
-        print('test set Average loss: {:.4f}'.format(test_loss / len(test_loader.dataset)))
+#             y1 = np.append(y1,y.numpy())
+#             y2 = np.append(y2,pred_y.numpy())
+#         print('test set Average loss: {:.4f}'.format(test_loss / len(test_loader.dataset)))
             
-        import matplotlib.pyplot as plt 
-        plt.plot(y1,label='real',color='blue')
-        plt.plot(y2,label='pred',color='red')
-        plt.legend()
-        plt.savefig(os.path.join("output/{}_{}day_testset_prediction_vs_real.png").format(metal.split('_')[0].strip('3M'), day ))
-        plt.close()
+#         import matplotlib.pyplot as plt 
+#         plt.plot(y1,label='real',color='blue')
+#         plt.plot(y2,label='pred',color='red')
+#         plt.legend()
+#         plt.savefig(os.path.join("output/{}_{}day_testset_prediction_vs_real.png").format(metal.split('_')[0].strip('3M'), day ))
+#         plt.close()
 
 def val(model,data,day,label):
     
@@ -167,7 +167,7 @@ def val(model,data,day,label):
         with torch.no_grad():
             
             x = torch.tensor(x).float().to(device)
-            pred_y = model(x).numpy()
+            pred_y = model(x).cpu().numpy()
             if( ind+day >= len(data.values)): 
                 temp = np.append(temp,pred_y)
             else:
@@ -224,7 +224,6 @@ if not os.path.exists(train_output):
     os.makedirs(train_output)
 
 for ind in range(len(trainfiles_3m)):
-    
 
     for i in [1,20,60]:
         # The train_data doesn't split training set and test set, so we do it manually by pass a string parameter.
@@ -238,7 +237,7 @@ for ind in range(len(trainfiles_3m)):
         mlp.init_weight() # 增加初始化
         optimizer = optim.SGD(mlp.parameters(), lr=0.001)
 
-        mlp = train(epochs=500, model = mlp, metal=trainfiles_3m[ind], day=i)
+        mlp = train(epochs=100, model = mlp, metal=trainfiles_3m[ind], day=i)
         # test(model = mlp, metal=trainfiles_3m[ind], day=i)
         Valdata = pd.read_csv(os.path.join(valpath, valfiles_3m[ind]),delimiter=',',index_col=0,usecols=(1,5)) 
         temp = pd.read_csv(os.path.join(trainpath, trainfiles_3m[ind]),delimiter=',',index_col=0,usecols=(1,5))[-i:]
