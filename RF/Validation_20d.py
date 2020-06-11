@@ -22,7 +22,7 @@ trainfiles_oi = ['LMEAluminium_OI_train.csv','LMECopper_OI_train.csv','LMELead_O
 
 def feature_extract(traindata_len,ind):
     
-        day = 60
+        day = 20 
         # Validation set
 
         val_oi = pd.read_csv(valpath+valfiles_oi[ind],delimiter=',',index_col=0,usecols=(1,2))
@@ -63,29 +63,62 @@ def feature_extract(traindata_len,ind):
         all_data = all_data.join(train_label)
 
         # Construct new features         
-        all_data['Price_diff_1'] = all_data['Close.Price'].diff(1)
-        all_data['NKY_diff_1'] = all_data['NKY'].diff(1)
-        all_data['SHSZ300_diff_1'] = all_data['SHSZ300'].diff(1)
-        all_data['SPX_diff_1'] = all_data['SPX'].diff(1)
-        all_data['SX5E_diff_1'] = all_data['SX5E'].diff(1)
-        all_data['UKX_diff_1'] = all_data['UKX'].diff(1)
-        all_data['VIX_diff_1'] = all_data['VIX'].diff(1)
-        all_data['Volume_diff_1'] = all_data['Volume'].diff(1)
+        # all_data['Price_diff_1'] = all_data['Close.Price'].diff(1)
+        # all_data['NKY_diff_1'] = all_data['NKY'].diff(1)
+        # all_data['SHSZ300_diff_1'] = all_data['SHSZ300'].diff(1)
+        # all_data['SPX_diff_1'] = all_data['SPX'].diff(1)
+        # all_data['SX5E_diff_1'] = all_data['SX5E'].diff(1)
+        # all_data['UKX_diff_1'] = all_data['UKX'].diff(1)
+        # all_data['VIX_diff_1'] = all_data['VIX'].diff(1)
+        # all_data['Volume_diff_1'] = all_data['Volume'].diff(1)
 
-        all_data['Price_diff_5'] = all_data['Close.Price'].diff(5)
-        all_data['NKY_diff_5'] = all_data['NKY'].diff(5)
+        # all_data['Price_diff_5'] = all_data['Close.Price'].diff(5)
+        # all_data['NKY_diff_5'] = all_data['NKY'].diff(5)
+        # all_data['SHSZ300_diff_5'] = all_data['SHSZ300'].diff(5)
+        # all_data['SPX_diff_5'] = all_data['SPX'].diff(5)
+        # all_data['SX5E_diff_5'] = all_data['SX5E'].diff(5)
+        # all_data['UKX_diff_5'] = all_data['UKX'].diff(5)
+        # all_data['VIX_diff_5'] = all_data['VIX'].diff(5)
+        # all_data['Volume_diff_5'] = all_data['Volume'].diff(5)
 
         all_data['Price_diff_10'] = all_data['Close.Price'].diff(10)
         all_data['NKY_diff_10'] = all_data['NKY'].diff(10)
+        all_data['SHSZ300_diff_10'] = all_data['SHSZ300'].diff(10)
+        all_data['SPX_diff_10'] = all_data['SPX'].diff(10)
+        all_data['SX5E_diff_10'] = all_data['SX5E'].diff(10)
+        all_data['UKX_diff_10'] = all_data['UKX'].diff(10)
+        all_data['VIX_diff_10'] = all_data['VIX'].diff(10)
+        all_data['Volume_diff_10'] = all_data['Volume'].diff(10)
+
 
         all_data['Price_diff_15'] = all_data['Close.Price'].diff(15)
         all_data['NKY_diff_15'] = all_data['NKY'].diff(15)
+        all_data['SHSZ300_diff_15'] = all_data['SHSZ300'].diff(15)
+        all_data['SPX_diff_15'] = all_data['SPX'].diff(15)
+        all_data['SX5E_diff_15'] = all_data['SX5E'].diff(15)
+        all_data['UKX_diff_15'] = all_data['UKX'].diff(15)
+        all_data['VIX_diff_15'] = all_data['VIX'].diff(15)
+        all_data['Volume_diff_15'] = all_data['Volume'].diff(15)
+
 
         all_data['Price_diff_20'] = all_data['Close.Price'].diff(20)
         all_data['NKY_diff_20'] = all_data['NKY'].diff(20)
+        all_data['SHSZ300_diff_20'] = all_data['SHSZ300'].diff(20)
+        all_data['SPX_diff_20'] = all_data['SPX'].diff(20)
+        all_data['SX5E_diff_20'] = all_data['SX5E'].diff(20)
+        all_data['UKX_diff_20'] = all_data['UKX'].diff(20)
+        all_data['VIX_diff_20'] = all_data['VIX'].diff(20)
+        all_data['Volume_diff_20'] = all_data['Volume'].diff(20)
+
 
         all_data['Price_diff_30'] = all_data['Close.Price'].diff(30)
         all_data['NKY_diff_30'] = all_data['NKY'].diff(30)
+        # all_data['SHSZ300_diff_30'] = all_data['SHSZ300'].diff(30)
+        # all_data['SPX_diff_30'] = all_data['SPX'].diff(30)
+        # all_data['SX5E_diff_30'] = all_data['SX5E'].diff(30)
+        # all_data['UKX_diff_30'] = all_data['UKX'].diff(30)
+        # all_data['VIX_diff_30'] = all_data['VIX'].diff(30)
+        # all_data['Volume_diff_30'] = all_data['Volume'].diff(30)
 
         data = all_data[-traindata_len-253:] #253 is the length of validation set
         return data
@@ -107,8 +140,8 @@ def train_rf(feature,label):
 
         return rf
 
-def val():
 
+def val():
 
     prediction = pd.DataFrame()
     prediction['id'] = []
@@ -117,7 +150,7 @@ def val():
     accuracy = 0    
     for ind in range(6):
 
-        traindata_len = 300 # window_size to train
+        traindata_len = 300 # window_size 
         data = feature_extract(traindata_len,ind=ind)
 
         window_start = traindata_len +253
@@ -129,10 +162,9 @@ def val():
         y_pred_all = np.array([])
         
         result = pd.read_csv('result_93.58.csv')
-        prefix = valfiles_oi[ind].split('_')[0]+'-validation-60d'
+        prefix = valfiles_oi[ind].split('_')[0]+'-validation-20d'
         while(flag):
                 if(window_end <= valdata_len):
-                         valdata_len =  window_end 
                          flag = 0
                         
                 train_data = data[-window_start:-window_end] 
@@ -145,29 +177,29 @@ def val():
                 else:
                         val_data = data[-window_end:]
                 val_feature = val_data[val_data.columns.difference(['label'])]
-        
+                
                 y_pred = rf.predict_proba(val_feature)[:,1]
-                y_pred[y_pred>0.8]=1
-                y_pred[y_pred<=0.8]=0
+                y_pred[y_pred>0.7]=1
+                y_pred[y_pred<=0.7]=0
                 y_pred_all = np.append(y_pred_all,y_pred)
 
                 if(flag):
                         data.loc[-window_end:-window_end+valdata_len,'label'] = y_pred
-                else:                     
+                else:                       
                         data.loc[-window_end:,'label'] = y_pred
-
+                
 
                 window_start -= valdata_len
                 window_end -= valdata_len
+
         acc = np.mean(result.loc[result['id'].str.contains(prefix)][-253:]['label'].values==y_pred_all)
         accuracy += acc
         print("accuracy: ",acc)
-        
         temp = pd.DataFrame({'id':prefix+'-'+data[-253:].index,'label':y_pred_all})
 
         prediction = prediction.append(temp)
-    print("Average accuracy:",accuracy/6)
 
+    print("Average accuracy:",accuracy/6)
     return prediction
 
 

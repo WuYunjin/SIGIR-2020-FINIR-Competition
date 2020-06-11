@@ -22,7 +22,7 @@ trainfiles_oi = ['LMEAluminium_OI_train.csv','LMECopper_OI_train.csv','LMELead_O
 
 def feature_extract(traindata_len,ind):
     
-        day = 60
+        day = 1
         # Validation set
 
         val_oi = pd.read_csv(valpath+valfiles_oi[ind],delimiter=',',index_col=0,usecols=(1,2))
@@ -74,25 +74,48 @@ def feature_extract(traindata_len,ind):
 
         all_data['Price_diff_5'] = all_data['Close.Price'].diff(5)
         all_data['NKY_diff_5'] = all_data['NKY'].diff(5)
+        all_data['SHSZ300_diff_5'] = all_data['SHSZ300'].diff(5)
+        all_data['SPX_diff_5'] = all_data['SPX'].diff(5)
+        all_data['SX5E_diff_5'] = all_data['SX5E'].diff(5)
+        all_data['UKX_diff_5'] = all_data['UKX'].diff(5)
+        all_data['VIX_diff_5'] = all_data['VIX'].diff(5)
+        all_data['Volume_diff_5'] = all_data['Volume'].diff(5)
 
         all_data['Price_diff_10'] = all_data['Close.Price'].diff(10)
         all_data['NKY_diff_10'] = all_data['NKY'].diff(10)
+        all_data['SHSZ300_diff_10'] = all_data['SHSZ300'].diff(10)
+        all_data['SPX_diff_10'] = all_data['SPX'].diff(10)
+        all_data['SX5E_diff_10'] = all_data['SX5E'].diff(10)
+        all_data['UKX_diff_10'] = all_data['UKX'].diff(10)
+        all_data['VIX_diff_10'] = all_data['VIX'].diff(10)
+        all_data['Volume_diff_10'] = all_data['Volume'].diff(10)
+
 
         all_data['Price_diff_15'] = all_data['Close.Price'].diff(15)
         all_data['NKY_diff_15'] = all_data['NKY'].diff(15)
+        all_data['SHSZ300_diff_15'] = all_data['SHSZ300'].diff(15)
+        all_data['SPX_diff_15'] = all_data['SPX'].diff(15)
+        all_data['SX5E_diff_15'] = all_data['SX5E'].diff(15)
+        all_data['UKX_diff_15'] = all_data['UKX'].diff(15)
+        all_data['VIX_diff_15'] = all_data['VIX'].diff(15)
+        all_data['Volume_diff_15'] = all_data['Volume'].diff(15)
+
 
         all_data['Price_diff_20'] = all_data['Close.Price'].diff(20)
         all_data['NKY_diff_20'] = all_data['NKY'].diff(20)
-
-        all_data['Price_diff_30'] = all_data['Close.Price'].diff(30)
-        all_data['NKY_diff_30'] = all_data['NKY'].diff(30)
+        all_data['SHSZ300_diff_20'] = all_data['SHSZ300'].diff(20)
+        all_data['SPX_diff_20'] = all_data['SPX'].diff(20)
+        all_data['SX5E_diff_20'] = all_data['SX5E'].diff(20)
+        all_data['UKX_diff_20'] = all_data['UKX'].diff(20)
+        all_data['VIX_diff_20'] = all_data['VIX'].diff(20)
+        all_data['Volume_diff_20'] = all_data['Volume'].diff(20)
 
         data = all_data[-traindata_len-253:] #253 is the length of validation set
         return data
 
 
 def train_rf(feature,label):
-        rf =  RandomForestClassifier(random_state=10,n_estimators=30)
+        rf =  RandomForestClassifier(random_state=10,n_estimators=20)
         rf.fit(feature,label)
                 
         # y_pred = rf.predict(feature)
@@ -117,19 +140,19 @@ def val():
     accuracy = 0    
     for ind in range(6):
 
-        traindata_len = 300 # window_size to train
+        traindata_len = 500 # window_size to train
         data = feature_extract(traindata_len,ind=ind)
 
         window_start = traindata_len +253
         window_end = 253
 
-        valdata_len = 1  
+        valdata_len = 30  
 
         flag = 1
         y_pred_all = np.array([])
         
         result = pd.read_csv('result_93.58.csv')
-        prefix = valfiles_oi[ind].split('_')[0]+'-validation-60d'
+        prefix = valfiles_oi[ind].split('_')[0]+'-validation-1d'
         while(flag):
                 if(window_end <= valdata_len):
                          valdata_len =  window_end 
@@ -147,8 +170,8 @@ def val():
                 val_feature = val_data[val_data.columns.difference(['label'])]
         
                 y_pred = rf.predict_proba(val_feature)[:,1]
-                y_pred[y_pred>0.8]=1
-                y_pred[y_pred<=0.8]=0
+                y_pred[y_pred>=0.6]=1
+                y_pred[y_pred<0.6]=0
                 y_pred_all = np.append(y_pred_all,y_pred)
 
                 if(flag):
