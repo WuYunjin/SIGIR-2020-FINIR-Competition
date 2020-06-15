@@ -11,13 +11,13 @@ from talib.abstract import *
 import argparse
 
 parser = argparse.ArgumentParser(description="xgboost")
-parser.add_argument('-t' ,'--train_data_len' , type=int , help='训练长度', default=500)
-parser.add_argument('-v','--valdata_len', type=int, help='迭代时的长度',default=20)
-parser.add_argument('-d','--max_depth', type=int, help='xgb max_length', default=7)
-parser.add_argument('-e'  ,'--eta' , type = float , help = 'xgb eta' , default=0.1)
-parser.add_argument('-g'  ,'--gamma' , type = float , help = 'xgb gamma' , default=0.0)
+parser.add_argument('-t' ,'--train_data_len' , type=int , help='training len', default=500)
+parser.add_argument('-v','--valdata_len', type=int, help='valuation len',default=1)
 parser.add_argument('-p'  ,'--prob' , type = float , help = 'xgb prob output threshold' , default=0.5)
-parser.add_argument('-n' , '--n_estimators' , type=int  , help='num of the estimate time' , default=100)
+parser.add_argument('-d','--max_depth', type=int, help='xgb max_length', default=8)
+parser.add_argument('-e'  ,'--eta' , type = float , help = 'xgb eta' , default=0.01)
+parser.add_argument('-g'  ,'--gamma' , type = float , help = 'xgb gamma' , default=0.0)
+parser.add_argument('-n' , '--n_estimators' , type=int  , help='num of the estimate time' , default=50)
 args = parser.parse_args()
 
 
@@ -90,10 +90,10 @@ def train_xgb(feature,label,params_xgb):
 
 def val():
 
-        logging.basicConfig(
-                filename='stack/xgb.log',
-                level=logging.INFO
-        )
+        # logging.basicConfig(
+        #         filename='stack/xgb.log',
+        #         level=logging.INFO
+        # )
         prediction = pd.DataFrame()
         prediction['id'] = []
         prediction['label'] = []
@@ -102,35 +102,44 @@ def val():
         
         
         accuracy = 0
-        # window_size to train
+        
+        # prob_list =[0.55,0.6,0.55,0.55,0.55,0.55] 
+        # valdata_len_list = [15,1,15,25,15,1] 
+        # train_data_len_list = [600, 600, 550, 550, 500,500] 
+
         prob = args.prob
         train_data_len = args.train_data_len
         valdata_len = args.valdata_len
         val_dummy = valdata_len
+        
         params_xgb = {
         'max_depth': args.max_depth,
         'gamma':args.gamma,
         'eta':args.eta,
         'objective': 'binary:logistic',
-        'base_score' :base, # 初始预测得分，全1或者全0的分数
+        'base_score' : base, # 初始预测得分，全1或者全0的分数
         'n_estimators': args.n_estimators
         }
 
-        print('the hyperparameter is(train , val , prob) :  ' , train_data_len ,' ', val_dummy , ' ' , prob , ' ')
+        # print('the hyperparameter is(train , val , prob) :  ' , train_data_len_list ,' ', valdata_len_list , ' ' , prob_list , ' ')
         print('the xgboost hyperparameter is :  ' , params_xgb)
 
-        logging.info('the hyperparameter is(train , val , prob) : %s   %s   %s  ' %(str(train_data_len),str(val_dummy),str(prob)) )
-        logging.info('the xgboost hyperparameter is :  %s ' %(str(params_xgb)) )
+        # logging.info('the hyperparameter is(train , val , prob) : %s   %s   %s  ' %(str(train_data_len),str(val_dummy),str(prob)) )
+        # logging.info('the xgboost hyperparameter is :  %s ' %(str(params_xgb)) )
 
-        for ind in range(6):
+        for ind in range(2,3):
 
-                # traindata_len = train_data_len_list[ind]
+                # train_data_len = train_data_len_list[ind]
+                # valdata_len = valdata_len_list[ind]
+                # val_dummy = valdata_len
+                # prob = prob_list[ind]
+
                 data = feature_extract(train_data_len,ind=ind)
 
                 window_start = train_data_len +253
                 window_end = 253
-                # valdata_len = valdata_len_list[ind]
-
+                
+                print('the hyperparameter is(train , val , prob) :  ' , train_data_len ,' ', valdata_len , ' ' , prob , ' ')
 
                 flag = 1
                 y_pred_all = np.array([])
@@ -166,6 +175,8 @@ def val():
 
                         window_start -= valdata_len
                         window_end -= valdata_len
+                        valdata_len = val_dummy
+                        
                 acc = np.mean(result.loc[result['id'].str.contains(prefix)][-253:]['label'].values==y_pred_all)
                 accuracy += acc
                 print("accuracy: ",acc)
@@ -173,7 +184,7 @@ def val():
                 temp = pd.DataFrame({'id':prefix+'-'+data[-253:].index,'label':y_pred_all})
 
                 prediction = prediction.append(temp)
-        logging.info("Average accuracy:%s"%(str(accuracy/6)))
+        # logging.info("Average accuracy:%s"%(str(accuracy/6)))
         print("Average accuracy:",str(accuracy/6))
         
 
@@ -184,5 +195,10 @@ if __name__ == "__main__":
 
         prediction = val()
         
-        # prediction['label'] = prediction['label'].astype(int)
-        # prediction.to_csv('xgb.csv',index=False)
+        result = pd.read_csv('result_93.58.csv')
+        prefix_20d = 'validation-20d'
+        prefix_60d = 'validation-60d'
+        output = prediction.append(result[result['id'].str.contains(prefix_20d)])
+        output = output.append(result[result['id'].str.contains(prefix_60d)])
+        output['label'] = output['label'].astype(int)
+        output.to_csv('output/xgb.csv',index=False)
