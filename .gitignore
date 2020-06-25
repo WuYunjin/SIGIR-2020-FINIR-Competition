@@ -139,3 +139,7 @@ output/
 
 #vscode
 .vscode
+
+# joelonglin test dir
+final/
+test.*
