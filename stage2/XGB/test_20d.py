@@ -33,10 +33,11 @@ def feature_extract(traindata_len,ind):
 
         # test set
         test_3m = pd.read_csv(testpath+testfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,2,3,4,5,6),names=['Index','open','high','low','close','volume'],skiprows=1)
-
+        test_oi = pd.read_csv(testpath+testfiles_oi[ind],delimiter=',',index_col=0,usecols=(1,2),names=['Index','OpenInterest'],skiprows=1)
 
         # Validation set
         val_3m = pd.read_csv(valpath+valfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,2,3,4,5,6),names=['Index','open','high','low','close','volume'],skiprows=1)
+        val_oi = pd.read_csv(valpath+valfiles_oi[ind],delimiter=',',index_col=0,usecols=(1,2),names=['Index','OpenInterest'],skiprows=1)
         val_label = pd.read_csv('datasets/compeition_sigir2020/Validation/validation_label_file.csv',names=['date','label'],skiprows=1)        
         prefix = valfiles_oi[ind].split('_')[0]+'-validation-'+str(day)+'d-'
         val_label = val_label.loc[val_label['date'].str.contains(prefix)]
@@ -51,15 +52,20 @@ def feature_extract(traindata_len,ind):
         train_label  = pd.read_csv(trainpath+suffix,delimiter=',',index_col=0,usecols=(1,2),names=['date','label'],skiprows=1)
 
         train_3m = pd.read_csv(trainpath+trainfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,2,3,4,5,6),names=['Index','open','high','low','close','volume'],skiprows=1)
-
+        train_oi = pd.read_csv(trainpath+trainfiles_oi[ind],delimiter=',',index_col=0,usecols=(1,2),names=['Index','OpenInterest'],skiprows=1)
 
 
         all_data = pd.concat([train_3m,val_3m,test_3m])
+        # all_data = all_data.join(pd.concat([train_oi,val_oi,test_oi]))
         # print(all_data.isnull().sum()) # Missing Value
         # all_data.fillna(method='ffill',inplace=True)
         # print(all_data.isnull().sum()) # Missing Value
 
         # Construct new features         
+        # all_data['yesterday_volume'] = all_data['volume'].shift(1)
+        # all_data['average5_volume'] = 0.2* (all_data['volume'].shift(1)+all_data['volume'].shift(2)+all_data['volume'].shift(3)+all_data['volume'].shift(4)+all_data['volume'].shift(5) )
+        # all_data['average5_OpenInterest'] = 0.2* (all_data['OpenInterest'].shift(1)+all_data['OpenInterest'].shift(2)+all_data['OpenInterest'].shift(3)+all_data['OpenInterest'].shift(4)+all_data['OpenInterest'].shift(5) )
+        
         all_data['sma_10'] = pd.DataFrame(SMA(all_data, timeperiod=10))
         all_data['mom_10'] = pd.DataFrame(MOM(all_data,10))
         all_data['wma_10'] = pd.DataFrame(WMA(all_data,10))
@@ -104,7 +110,7 @@ def train_rf(feature,label):
 
         return rf
 
-def val():
+def val(threshold=[0.4,0.6,0.5,0.4,0.3,0.3]):
 
 
     prediction = pd.DataFrame()
@@ -146,7 +152,7 @@ def val():
         
                 y_pred = rf.predict_proba(val_feature)[:,0]
 
-                y_pred = [0 if x>0.4 else 1 for x in y_pred]
+                y_pred = [0 if x>threshold[ind] else 1 for x in y_pred]
                 
                 y_pred_all = np.append(y_pred_all,y_pred)
 
@@ -172,6 +178,8 @@ def val():
 
 if __name__ == "__main__":
 
+        # for t in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8]:
+        #         print("threshold:",t)
         prediction = val()
         
         # prediction['label'] = prediction['label'].astype(int)

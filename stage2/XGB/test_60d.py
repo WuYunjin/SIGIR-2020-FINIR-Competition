@@ -106,7 +106,7 @@ def train_rf(feature,label):
 
         return rf
 
-def val():
+def val(threshold=[0.4,0.5,0.4,0.5,0.2,0.4]):
 
 
     prediction = pd.DataFrame()
@@ -148,7 +148,7 @@ def val():
         
                 y_pred = rf.predict_proba(val_feature)[:,0]
 
-                y_pred = [0 if x>=0.4 else 1 for x in y_pred]
+                y_pred = [0 if x>=threshold[ind] else 1 for x in y_pred]
                 
                 y_pred_all = np.append(y_pred_all,y_pred)
 
@@ -173,7 +173,9 @@ def val():
 
 
 if __name__ == "__main__":
-
+        # for t in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8]:
+        #         print("threshold:",t)
+        #         prediction = val(t)
         prediction = val()
         
         # prediction['label'] = prediction['label'].astype(int)
