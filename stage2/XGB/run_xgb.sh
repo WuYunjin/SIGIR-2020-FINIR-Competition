@@ -18,7 +18,7 @@ do
         do
             for prob in 0.65 0.6 0.55 0.5
             do      
-                python stage2/XGB/test1d.py -t=$train -v=$val -d=$depth -e=$eta -p=$prob -n=$n_estimators -m=$metal
+                python stage2/XGB/test1d_search.py -t=$train -v=$val -d=$depth -e=$eta -p=$prob -n=$n_estimators -m=$metal
             done
         done
     done

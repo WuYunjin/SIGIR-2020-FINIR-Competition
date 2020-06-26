@@ -142,4 +142,5 @@ output/
 
 # joelonglin test dir
 final/
-test.*
+test/
+test_stack/
