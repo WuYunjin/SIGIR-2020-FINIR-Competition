@@ -104,10 +104,10 @@ def train_xgb(feature,label,params_xgb):
 
 def val():
 
-        # logging.basicConfig(
-        #         filename='stack/xgb.log',
-        #         level=logging.INFO
-        # )
+        logging.basicConfig(
+                filename='stage2/XGB/xgb.log',
+                level=logging.INFO
+        )
         prediction = pd.DataFrame()
         prediction['id'] = []
         prediction['label'] = []
@@ -197,7 +197,7 @@ def val():
                     logging.info('The target metal is {}'.format(testfiles_oi[ind].split('_')[0]))
                     logging.info('the hyperparameter is(train , val , prob) : %s   %s   %s  ' %(str(train_data_len),str(val_dummy),str(prob)) )
                     logging.info('the xgboost hyperparameter is :  %s ' %(str(params_xgb)) )
-                    logging.info("accuracy: ",acc)
+                    logging.info("accuracy: %s "%( str(acc) ))
                 accuracy += acc
                 print("accuracy: ",acc)
 
