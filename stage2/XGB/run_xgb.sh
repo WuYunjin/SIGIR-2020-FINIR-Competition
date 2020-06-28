@@ -9,16 +9,18 @@
 # args = parser.parse_args()
 n_estimators='50'
 eta='0.01'
-depth='8'
-for metal in 0 1 2 3 4 5 
+depth='10'
+day='20'
+log='0.6'
+for metal in 0 1 2 3 5 
 do
-    for train in 650 500 550 600
+    for train in 400 450 500 550 600 #650 600 550 500
     do
-        for val in 25 20 15 10 5 3 1
+        for val in 1 3 5 10 #25 20 15 10 5 3 1
         do
-            for prob in 0.65 0.6 0.55 0.5
+            for prob in 0.7 0.65 0.6 0.55 0.5 0.45 0.4
             do      
-                python stage2/XGB/test1d_search.py -t=$train -v=$val -d=$depth -e=$eta -p=$prob -n=$n_estimators -m=$metal
+                python stage2/XGB/test_search.py -t=$train -v=$val -d=$depth -e=$eta -p=$prob -n=$n_estimators -m=$metal -D=$day -l=$log
             done
         done
     done

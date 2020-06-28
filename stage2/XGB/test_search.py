@@ -19,6 +19,8 @@ parser.add_argument('-e'  ,'--eta' , type = float , help = 'xgb eta' , default=0
 parser.add_argument('-g'  ,'--gamma' , type = float , help = 'xgb gamma' , default=0.0)
 parser.add_argument('-m'  ,'--metal' , type = int , help = 'index of the target metal' , default=0)
 parser.add_argument('-n' , '--n_estimators' , type=int  , help='num of the estimate time' , default=50)
+parser.add_argument('-D' , '--day' , type=int  , help='day to predict' , default=1)
+parser.add_argument('-l' , '--log' , type=float  , help='log the result better than this value' , default=0.55)
 args = parser.parse_args()
 
 testpath = 'datasets/compeition_sigir2020/Test/Test_data/'
@@ -41,7 +43,7 @@ trainfiles_oi = ['LMEAluminium_OI_train.csv','LMECopper_OI_train.csv','LMELead_O
 # extract feature for  ind-th metal
 def feature_extract(traindata_len,ind):
     
-        day = 1
+        day = args.day
         # test set
         test_3m = pd.read_csv(testpath+testfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,2,3,4,5,6),names=['Index','open','high','low','close','volume'],skiprows=1)
 
@@ -69,7 +71,7 @@ def feature_extract(traindata_len,ind):
         # print(all_data.isnull().sum()) # Missing Value
 
         # Construct new features         
-        all_data['diff_1'] = all_data['close'].diff(1)
+        
         all_data['sma_10'] = pd.DataFrame(SMA(all_data, timeperiod=10))
         all_data['mom_10'] = pd.DataFrame(MOM(all_data,10))
         all_data['wma_10'] = pd.DataFrame(WMA(all_data,10))
@@ -86,7 +88,7 @@ def feature_extract(traindata_len,ind):
         all_data['pct_change_20'] = ROC(all_data, timeperiod=20)
         all_data['pct_change_30'] = ROC(all_data, timeperiod=30)
         all_data['pct_change_60'] = ROC(all_data, timeperiod=60)
-
+        # all_data['diff_day'] = all_data['close'].diff(day)
         all_data.dropna(inplace=True)
 
         all_data = all_data.join(pd.concat([train_label,val_label]))
@@ -112,8 +114,7 @@ def val():
         prediction['id'] = []
         prediction['label'] = []
         result = pd.read_csv('result_leak.csv')
-        base = np.mean(result.loc[result['id'].str.contains('test-1d')]['label'].values==0)
-        
+        base = np.mean(result.loc[result['id'].str.contains('test-{}d'.format(args.day))]['label'].values==0)
         
         accuracy = 0
         
@@ -131,7 +132,7 @@ def val():
         'gamma':args.gamma,
         'eta':args.eta,
         'objective': 'binary:logistic',
-        'base_score' : base, # 初始预测得分，全1或者全0的分数
+        'base_score' : base if base>0.5 else 1-base, # 初始预测得分，全1或者全0的分数
         'n_estimators': args.n_estimators
         }
 
@@ -159,7 +160,12 @@ def val():
                 y_pred_all = np.array([])
 
                 
-                prefix = valfiles_oi[ind].split('_')[0]+'-test-1d'
+                prefix = valfiles_oi[ind].split('_')[0]+'-test-{}d'.format(args.day)
+                bias = np.mean(result.loc[result['id'].str.contains(prefix)]['label'].values==1)
+                if bias > prob:
+                        break
+                # print('all 0 acc :' ,bias)
+                # exit()
                 while(flag):
                         # print('for now window_end is {} valdate_len is {}'.format(window_end , valdata_len))
                         if(window_end <= valdata_len):
@@ -193,8 +199,8 @@ def val():
                         valdata_len = val_dummy
                         
                 acc = np.mean(result.loc[result['id'].str.contains(prefix)][-253:]['label'].values==y_pred_all)
-                if acc > 0.55:
-                    logging.info('The target metal is {}'.format(testfiles_oi[ind].split('_')[0]))
+                if acc > args.log:
+                    logging.info('\nThe target metal is {} and prediction {} days'.format(testfiles_oi[ind].split('_')[0], str(args.day)))
                     logging.info('the hyperparameter is(train , val , prob) : %s   %s   %s  ' %(str(train_data_len),str(val_dummy),str(prob)) )
                     logging.info('the xgboost hyperparameter is :  %s ' %(str(params_xgb)) )
                     logging.info("accuracy: %s "%( str(acc) ))
@@ -209,6 +215,7 @@ def val():
         
 
         return prediction
+
 
 
 if __name__ == "__main__":
