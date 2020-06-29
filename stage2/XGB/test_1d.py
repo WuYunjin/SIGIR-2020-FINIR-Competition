@@ -27,7 +27,7 @@ trainfiles_oi = ['LMEAluminium_OI_train.csv','LMECopper_OI_train.csv','LMELead_O
 
         
 # extract feature for  ind-th metal
-def feature_extract(traindata_len,ind):
+def feature_extract(traindata_len,ind,add_diff):
     
         day = 1
         # test set
@@ -56,8 +56,9 @@ def feature_extract(traindata_len,ind):
         # all_data.fillna(method='ffill',inplace=True)
         # print(all_data.isnull().sum()) # Missing Value
 
-        # Construct new features         
-        all_data['diff_1'] = all_data['close'].diff(1)
+        # Construct new features
+        if add_diff:
+                all_data['diff_1'] = all_data['close'].diff(1)
         all_data['sma_10'] = pd.DataFrame(SMA(all_data, timeperiod=10))
         all_data['mom_10'] = pd.DataFrame(MOM(all_data,10))
         all_data['wma_10'] = pd.DataFrame(WMA(all_data,10))
@@ -101,33 +102,36 @@ def val():
         
         accuracy = 0
         
-        prob_list =[0.65,0.5,0.5,0.55,0.55,0.6] 
-        valdata_len_list = [20,20,25,3,20,25] 
-        train_data_len_list = [500, 600, 650, 650, 500,650] 
+        prob_list =[0.65, 0.5, 0.45, 0.45, 0.55, 0.6] 
+        valdata_len_list = [20,20,10,5,20,25] 
+        train_data_len_list = [500, 600, 250, 200, 500,650]
+        depth_list = [8,8,10,10,8,8]
+        use_diff = [True , True , False , False , True , True]
 
         params_xgb = {
-        'max_depth': 8,
+        # 'max_depth': 8,
         'gamma':0.0,
         'eta':0.01,
         'objective': 'binary:logistic',
-        'base_score' : base, # 初始预测得分，全1或者全0的分数
+        'base_score' : base if base>0.5 else 1-base, # 初始预测得分，全1或者全0的分数
         'n_estimators': 50
         }
 
         for ind in range(6):
-
+                params_xgb['max_depth'] = depth_list[ind]
                 train_data_len = train_data_len_list[ind]
                 valdata_len = valdata_len_list[ind]
                 val_dummy = valdata_len
                 prob = prob_list[ind]
 
-                data = feature_extract(train_data_len,ind=ind)
+                data = feature_extract(train_data_len,ind=ind , add_diff = use_diff[ind])
 
                 window_start = train_data_len +253
                 window_end = 253
                 
-                print('The target metal is {}'.format(testfiles_oi[ind].split('_')[0]))
-                print('the hyperparameter is(train , val , prob) :  ' , train_data_len ,' ', valdata_len , ' ' , prob , ' ')
+                # print('The target metal is {}'.format(testfiles_oi[ind].split('_')[0]))
+                # print('the hyperparameter is(train , val , prob) :  ' , train_data_len ,' ', valdata_len , ' ' , prob , ' ')
+                # print('the hyperparameter of xgboost is :  ' ,  params_xgb)
 
                 flag = 1
                 y_pred_all = np.array([])
@@ -167,7 +171,7 @@ def val():
                         valdata_len = val_dummy
                         
                 acc = np.mean(result.loc[result['id'].str.contains(prefix)][-253:]['label'].values==y_pred_all)
-                
+                print('accuracy : ' , acc)
                 accuracy += acc
 
                 temp = pd.DataFrame({'id':prefix+'-'+data[-253:].index,'label':y_pred_all})

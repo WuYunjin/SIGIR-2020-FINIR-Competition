@@ -16,13 +16,13 @@ prediction['label'] = []
 
 print("Predicting 60day ....")
 prediction = prediction.append( val_60() )
-
+print("Predicting 20day ....")
 prediction = prediction.append( val_20() )
-
+print("Predicting 1day ....")
 prediction = prediction.append( val_1() )
 
 prediction['label'] = prediction['label'].astype(int)
-prediction.to_csv('result_xgb1d.csv',index=False)
+prediction.to_csv('result_xgb1d20d_2.csv',index=False)
 
 
 time_end=time.time()

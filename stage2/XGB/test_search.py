@@ -21,6 +21,7 @@ parser.add_argument('-m'  ,'--metal' , type = int , help = 'index of the target 
 parser.add_argument('-n' , '--n_estimators' , type=int  , help='num of the estimate time' , default=50)
 parser.add_argument('-D' , '--day' , type=int  , help='day to predict' , default=1)
 parser.add_argument('-l' , '--log' , type=float  , help='log the result better than this value' , default=0.55)
+parser.add_argument('-u' , '--use_diff' , type=bool  , help='Whether to add diff to the feature' , default=False)
 args = parser.parse_args()
 
 testpath = 'datasets/compeition_sigir2020/Test/Test_data/'
@@ -41,7 +42,7 @@ trainfiles_oi = ['LMEAluminium_OI_train.csv','LMECopper_OI_train.csv','LMELead_O
 
         
 # extract feature for  ind-th metal
-def feature_extract(traindata_len,ind):
+def feature_extract(traindata_len,ind, add_diff):
     
         day = args.day
         # test set
@@ -71,7 +72,8 @@ def feature_extract(traindata_len,ind):
         # print(all_data.isnull().sum()) # Missing Value
 
         # Construct new features         
-        
+        if add_diff:
+                all_data['diff_{}'.format(day)] = all_data['close'].diff(day)
         all_data['sma_10'] = pd.DataFrame(SMA(all_data, timeperiod=10))
         all_data['mom_10'] = pd.DataFrame(MOM(all_data,10))
         all_data['wma_10'] = pd.DataFrame(WMA(all_data,10))
@@ -107,7 +109,7 @@ def train_xgb(feature,label,params_xgb):
 def val():
 
         logging.basicConfig(
-                filename='stage2/XGB/xgb.log',
+                filename='stage2/XGB/xgb_{}day.log'.format(args.day),
                 level=logging.INFO
         )
         prediction = pd.DataFrame()
@@ -137,7 +139,7 @@ def val():
         }
 
         # print('the hyperparameter is(train , val , prob) :  ' , train_data_len_list ,' ', valdata_len_list , ' ' , prob_list , ' ')
-        print('the xgboost hyperparameter is :  ' , params_xgb)
+        
 
         
 
@@ -148,13 +150,14 @@ def val():
                 # val_dummy = valdata_len
                 # prob = prob_list[ind]
 
-                data = feature_extract(train_data_len,ind=ind)
+                data = feature_extract(train_data_len,ind=ind, add_diff=args.use_diff)
 
                 window_start = train_data_len +253
                 window_end = 253
                 
                 print('The target metal is {}'.format(testfiles_oi[ind].split('_')[0]))
                 print('the hyperparameter is(train , val , prob) :  ' , train_data_len ,' ', valdata_len , ' ' , prob , ' ')
+                print('the xgboost hyperparameter is :  ' , params_xgb)
 
                 flag = 1
                 y_pred_all = np.array([])
@@ -162,10 +165,10 @@ def val():
                 
                 prefix = valfiles_oi[ind].split('_')[0]+'-test-{}d'.format(args.day)
                 bias = np.mean(result.loc[result['id'].str.contains(prefix)]['label'].values==1)
-                if bias > prob:
-                        break
-                # print('all 0 acc :' ,bias)
-                # exit()
+                # if bias > prob:
+                #         break
+                print('all 1 acc :' ,bias)
+                
                 while(flag):
                         # print('for now window_end is {} valdate_len is {}'.format(window_end , valdata_len))
                         if(window_end <= valdata_len):
