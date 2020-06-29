@@ -21,8 +21,9 @@ parser.add_argument('-m'  ,'--metal' , type = int , help = 'index of the target 
 parser.add_argument('-n' , '--n_estimators' , type=int  , help='num of the estimate time' , default=50)
 parser.add_argument('-D' , '--day' , type=int  , help='day to predict' , default=1)
 parser.add_argument('-l' , '--log' , type=float  , help='log the result better than this value' , default=0.55)
-parser.add_argument('-u' , '--use_diff' , type=bool  , help='Whether to add diff to the feature' , default=False)
+parser.add_argument('-u' , '--use_diff' , type=str  , help='Whether to add diff to the feature' , default='False')
 args = parser.parse_args()
+
 
 testpath = 'datasets/compeition_sigir2020/Test/Test_data/'
 testfiles_3m = ['LMEAluminium3M_test.csv','LMECopper3M_test.csv','LMELead3M_test.csv','LMENickel3M_test.csv','LMETin3M_test.csv','LMEZinc3M_test.csv']
@@ -138,10 +139,7 @@ def val():
         'n_estimators': args.n_estimators
         }
 
-        # print('the hyperparameter is(train , val , prob) :  ' , train_data_len_list ,' ', valdata_len_list , ' ' , prob_list , ' ')
-        
-
-        
+        use_diff = True if args.use_diff =='True' else False
 
         for ind in range(args.metal , args.metal+1):
 
@@ -150,13 +148,13 @@ def val():
                 # val_dummy = valdata_len
                 # prob = prob_list[ind]
 
-                data = feature_extract(train_data_len,ind=ind, add_diff=args.use_diff)
+                data = feature_extract(train_data_len,ind=ind, add_diff=use_diff)
 
                 window_start = train_data_len +253
                 window_end = 253
                 
-                print('The target metal is {}'.format(testfiles_oi[ind].split('_')[0]))
-                print('the hyperparameter is(train , val , prob) :  ' , train_data_len ,' ', valdata_len , ' ' , prob , ' ')
+                print('The target metal is {} for {} day'.format(testfiles_oi[ind].split('_')[0] , args.day))
+                print('the hyperparameter is(train , val , prob , use_diff) :  ' , train_data_len ,' ', valdata_len , ' ' , prob , ' ', use_diff)
                 print('the xgboost hyperparameter is :  ' , params_xgb)
 
                 flag = 1
@@ -204,7 +202,7 @@ def val():
                 acc = np.mean(result.loc[result['id'].str.contains(prefix)][-253:]['label'].values==y_pred_all)
                 if acc > args.log:
                     logging.info('\nThe target metal is {} and prediction {} days'.format(testfiles_oi[ind].split('_')[0], str(args.day)))
-                    logging.info('the hyperparameter is(train , val , prob) : %s   %s   %s  ' %(str(train_data_len),str(val_dummy),str(prob)) )
+                    logging.info('the hyperparameter is(train , val , prob , use_diff) : %s   %s   %s  %s' %(str(train_data_len),str(val_dummy),str(prob) , str(use_diff)) )
                     logging.info('the xgboost hyperparameter is :  %s ' %(str(params_xgb)) )
                     logging.info("accuracy: %s "%( str(acc) ))
                 accuracy += acc

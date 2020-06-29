@@ -12,18 +12,26 @@
 n_estimators='50'
 eta='0.01'
 depth='10'
-day='1'
-log='0.55'
-for metal in 2 3 #0 1 2 3 4 5 
+day='60'
+log='0.63'
+#不要用逗号，定义变量后面不能直接加注释
+use_diff_list=("False" "True")
+
+
+for metal in 0 #1 2 3 4 5 
 do
     for train in 100 150 200 250 300 #350 400 450 500 #650 600 550 500
     do
         for val in 1 3 5 10 #25 20 15 10 5 3 1
         do
-            for prob in  0.55 0.5 0.45 0.4 0.3 #0.7 0.65 0.6
-            do      
-                python stage2/XGB/test_search.py -t=$train -v=$val -d=$depth -e=$eta -p=$prob -n=$n_estimators -m=$metal -D=$day -l=$log
+            for prob in  0.7 0.65 0.6 0.55 0.45 0.4 0.3 #0.7 0.65 0.6
+            do   
+                for use_diff in ${use_diff_list[@]}
+                do
+                    python stage2/XGB/test_search.py -t=$train -v=$val -d=$depth -e=$eta -p=$prob -n=$n_estimators -m=$metal -D=$day -l=$log -u=$use_diff
+                done
             done
         done
     done
 done
+
