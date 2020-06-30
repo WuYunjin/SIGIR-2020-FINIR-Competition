@@ -101,9 +101,10 @@ def train_rf(feature,label):
 
         return rf
 
-def val(threshold=[0.4,0.5,0.6,0.6,0.4,0.4]):
+def val(traindata_len,valdata_len,threshold):#(threshold=[0.4,0.5,0.6,0.6,0.4,0.4]):
 
 
+    print("traindata_len,valdata_len,threshold:",traindata_len,valdata_len,threshold)   
     prediction = pd.DataFrame()
     prediction['id'] = []
     prediction['label'] = []
@@ -111,13 +112,13 @@ def val(threshold=[0.4,0.5,0.6,0.6,0.4,0.4]):
     accuracy = 0    
     for ind in range(6):
 
-        traindata_len = 90 # window_size to train
+        # traindata_len = 90 # window_size to train
         data = feature_extract(traindata_len,ind=ind)
 
         window_start = traindata_len + 253
         window_end = 253
 
-        valdata_len = 1
+        # valdata_len = 1
 
         flag = 1
         y_pred_all = np.array([])
@@ -143,7 +144,7 @@ def val(threshold=[0.4,0.5,0.6,0.6,0.4,0.4]):
         
                 y_pred = rf.predict_proba(val_feature)[:,0]
 
-                y_pred = [0 if x>threshold[ind] else 1 for x in y_pred]
+                y_pred = [0 if x>threshold else 1 for x in y_pred]
                 
                 y_pred_all = np.append(y_pred_all,y_pred)
 
@@ -157,19 +158,23 @@ def val(threshold=[0.4,0.5,0.6,0.6,0.4,0.4]):
                 window_end -= valdata_len
         acc = np.mean(result.loc[result['id'].str.contains(prefix)][-253:]['label'].values==y_pred_all)
         accuracy += acc
-        print("accuracy: ",acc)
+        if(acc>0.54): 
+                print("metal = {},accuracy:{} ".format(valfiles_oi[ind].split('_')[0],acc))
         
         temp = pd.DataFrame({'id':prefix+'-'+data[-253:].index,'label':y_pred_all})
 
         prediction = prediction.append(temp)
-    print("Average accuracy:",accuracy/6)
+#     print("Average accuracy:",accuracy/6)
 
     return prediction
 
 
 if __name__ == "__main__":
 
-        prediction = val()
+        for traindata_len in [60,90,100,120,150,200,250,300]:
+                for valdata_len in [1,3,5,10,20]:
+                        for threshold in [0.2,0.3,0.4,0.5,0.6,0.7,0.8]:
+                                prediction = val(traindata_len,valdata_len,threshold)
 
         # prediction['label'] = prediction['label'].astype(int)
         # prediction.to_csv('result.csv',index=False)
