@@ -13,12 +13,12 @@ n_estimators='50'
 eta='0.01'
 depth='10'
 day='60'
-log='0.63'
+log='0.65'
 #不要用逗号，定义变量后面不能直接加注释
 use_diff_list=("False" "True")
 
 
-for metal in 0 #1 2 3 4 5 
+for metal in 0 #0 1 2 3 4 5 
 do
     for train in 100 150 200 250 300 #350 400 450 500 #650 600 550 500
     do

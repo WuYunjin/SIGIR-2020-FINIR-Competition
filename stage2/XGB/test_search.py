@@ -98,6 +98,69 @@ def feature_extract(traindata_len,ind, add_diff):
         data = all_data[-traindata_len-253:] #253 is the length of validation set
         return data
 
+def feature_extract_60d(traindata_len,ind,add_diff):
+    
+        day = 60
+
+        # test set
+        test_3m = pd.read_csv(testpath+testfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,2,3,4,5,6),names=['Index','open','high','low','close','volume'],skiprows=1)
+
+
+        # Validation set
+        val_3m = pd.read_csv(valpath+valfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,2,3,4,5,6),names=['Index','open','high','low','close','volume'],skiprows=1)
+        val_label = pd.read_csv('datasets/compeition_sigir2020/Validation/validation_label_file.csv',names=['date','label'],skiprows=1)        
+        prefix = valfiles_oi[ind].split('_')[0]+'-validation-'+str(day)+'d-'
+        val_label = val_label.loc[val_label['date'].str.contains(prefix)]
+        val_label['date'] = val_label['date'].apply(lambda x: x.replace(prefix,''))
+        val_label.set_index(['date'], inplace=True)
+
+
+
+        #Trainning set
+
+        suffix = 'Label_'+trainfiles_3m[ind].split('_')[0].strip('3M')+'_train_'+str(day)+'d.csv'
+        train_label  = pd.read_csv(trainpath+suffix,delimiter=',',index_col=0,usecols=(1,2),names=['date','label'],skiprows=1)
+
+        train_3m = pd.read_csv(trainpath+trainfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,2,3,4,5,6),names=['Index','open','high','low','close','volume'],skiprows=1)
+
+
+
+        all_data = pd.concat([train_3m,val_3m,test_3m])
+        # print(all_data.isnull().sum()) # Missing Value
+        # all_data.fillna(method='ffill',inplace=True)
+        # print(all_data.isnull().sum()) # Missing Value
+
+        # Construct new features
+        if add_diff:
+                all_data['diff_60'] = all_data['close'].diff(60)        
+        all_data['sma_10'] = pd.DataFrame(SMA(all_data, timeperiod=10))
+        all_data['mom_10'] = pd.DataFrame(MOM(all_data,10))
+        all_data['wma_10'] = pd.DataFrame(WMA(all_data,10))
+        all_data['sma_20'] = pd.DataFrame(SMA(all_data, timeperiod=20))
+        all_data['mom_20'] = pd.DataFrame(MOM(all_data,20))
+        all_data['wma_20'] = pd.DataFrame(WMA(all_data,20))
+        all_data = pd.concat([all_data,STOCHF(all_data, 
+                                          fastk_period=14, 
+                                          fastd_period=3)],
+                             axis=1)
+ 
+        all_data['macd'] = pd.DataFrame(MACD(all_data, fastperiod=12, slowperiod=26)['macd'])
+        all_data['rsi'] = pd.DataFrame(RSI(all_data, timeperiod=14))
+        all_data['willr'] = pd.DataFrame(WILLR(all_data, timeperiod=14))
+        all_data['cci'] = pd.DataFrame(CCI(all_data, timeperiod=14))
+        
+        
+        all_data['pct_change_20'] = ROC(all_data, timeperiod=20)
+        all_data['pct_change_40'] = ROC(all_data, timeperiod=40)
+        # all_data['pct_change_30'] = ROC(all_data, timeperiod=30)
+        # all_data['pct_change_60'] = ROC(all_data, timeperiod=60)
+
+        all_data.dropna(inplace=True)
+
+        all_data = all_data.join(pd.concat([train_label,val_label]))
+
+        data = all_data[-traindata_len-253:] #253 is the length of test set
+        return data
 
 def train_xgb(feature,label,params_xgb):
         
@@ -148,7 +211,7 @@ def val():
                 # val_dummy = valdata_len
                 # prob = prob_list[ind]
 
-                data = feature_extract(train_data_len,ind=ind, add_diff=use_diff)
+                data = feature_extract_60d(train_data_len,ind=ind, add_diff=use_diff)
 
                 window_start = train_data_len +253
                 window_end = 253

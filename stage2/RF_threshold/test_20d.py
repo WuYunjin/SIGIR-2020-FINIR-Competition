@@ -118,7 +118,7 @@ def val(threshold=[0.4,0.6,0.5,0.4,0.3,0.3]):
     prediction['label'] = []
 
     accuracy = 0    
-    for ind in range(6):
+    for ind in range(3,4):
 
         traindata_len = 200 # window_size to train
         data = feature_extract(traindata_len,ind=ind)

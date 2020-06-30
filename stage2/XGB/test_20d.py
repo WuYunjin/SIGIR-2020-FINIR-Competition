@@ -5,7 +5,7 @@ from sklearn.ensemble import RandomForestClassifier
 from  sklearn.model_selection import GridSearchCV
 from sklearn import tree
 import xgboost as xgb
-import logging
+
 
 from talib.abstract import *
 
@@ -27,7 +27,7 @@ trainfiles_oi = ['LMEAluminium_OI_train.csv','LMECopper_OI_train.csv','LMELead_O
 
         
 # extract feature for  ind-th metal
-def feature_extract(traindata_len,ind):
+def feature_extract_xgb(traindata_len,ind, add_diff ):
     
         day = 20
         # test set
@@ -56,7 +56,9 @@ def feature_extract(traindata_len,ind):
         # all_data.fillna(method='ffill',inplace=True)
         # print(all_data.isnull().sum()) # Missing Value
 
-        # Construct new features         
+        # Construct new features
+        if add_diff:
+                all_data['diff_20'] = all_data['close'].diff(20)      
         all_data['sma_10'] = pd.DataFrame(SMA(all_data, timeperiod=10))
         all_data['mom_10'] = pd.DataFrame(MOM(all_data,10))
         all_data['wma_10'] = pd.DataFrame(WMA(all_data,10))
@@ -80,6 +82,77 @@ def feature_extract(traindata_len,ind):
         data = all_data[-traindata_len-253:] #253 is the length of validation set
         return data
 
+def feature_extract_rf(traindata_len,ind ,add_diff_dummy):
+    
+        day = 20
+
+        # test set
+        test_3m = pd.read_csv(testpath+testfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,2,3,4,5,6),names=['Index','open','high','low','close','volume'],skiprows=1)
+        test_oi = pd.read_csv(testpath+testfiles_oi[ind],delimiter=',',index_col=0,usecols=(1,2),names=['Index','OpenInterest'],skiprows=1)
+
+        # Validation set
+        val_3m = pd.read_csv(valpath+valfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,2,3,4,5,6),names=['Index','open','high','low','close','volume'],skiprows=1)
+        val_oi = pd.read_csv(valpath+valfiles_oi[ind],delimiter=',',index_col=0,usecols=(1,2),names=['Index','OpenInterest'],skiprows=1)
+        val_label = pd.read_csv('datasets/compeition_sigir2020/Validation/validation_label_file.csv',names=['date','label'],skiprows=1)        
+        prefix = valfiles_oi[ind].split('_')[0]+'-validation-'+str(day)+'d-'
+        val_label = val_label.loc[val_label['date'].str.contains(prefix)]
+        val_label['date'] = val_label['date'].apply(lambda x: x.replace(prefix,''))
+        val_label.set_index(['date'], inplace=True)
+
+
+
+        #Trainning set
+
+        suffix = 'Label_'+trainfiles_3m[ind].split('_')[0].strip('3M')+'_train_'+str(day)+'d.csv'
+        train_label  = pd.read_csv(trainpath+suffix,delimiter=',',index_col=0,usecols=(1,2),names=['date','label'],skiprows=1)
+
+        train_3m = pd.read_csv(trainpath+trainfiles_3m[ind],delimiter=',',index_col=0,usecols=(1,2,3,4,5,6),names=['Index','open','high','low','close','volume'],skiprows=1)
+        train_oi = pd.read_csv(trainpath+trainfiles_oi[ind],delimiter=',',index_col=0,usecols=(1,2),names=['Index','OpenInterest'],skiprows=1)
+
+
+        all_data = pd.concat([train_3m,val_3m,test_3m])
+        # all_data = all_data.join(pd.concat([train_oi,val_oi,test_oi]))
+        # print(all_data.isnull().sum()) # Missing Value
+        # all_data.fillna(method='ffill',inplace=True)
+        # print(all_data.isnull().sum()) # Missing Value
+
+        # Construct new features         
+        # all_data['yesterday_volume'] = all_data['volume'].shift(1)
+        # all_data['average5_volume'] = 0.2* (all_data['volume'].shift(1)+all_data['volume'].shift(2)+all_data['volume'].shift(3)+all_data['volume'].shift(4)+all_data['volume'].shift(5) )
+        # all_data['average5_OpenInterest'] = 0.2* (all_data['OpenInterest'].shift(1)+all_data['OpenInterest'].shift(2)+all_data['OpenInterest'].shift(3)+all_data['OpenInterest'].shift(4)+all_data['OpenInterest'].shift(5) )
+        
+        all_data['sma_10'] = pd.DataFrame(SMA(all_data, timeperiod=10))
+        all_data['mom_10'] = pd.DataFrame(MOM(all_data,10))
+        all_data['wma_10'] = pd.DataFrame(WMA(all_data,10))
+        all_data['sma_20'] = pd.DataFrame(SMA(all_data, timeperiod=20))
+        all_data['mom_20'] = pd.DataFrame(MOM(all_data,20))
+        all_data['wma_20'] = pd.DataFrame(WMA(all_data,20))
+        all_data = pd.concat([all_data,STOCHF(all_data, 
+                                          fastk_period=14, 
+                                          fastd_period=3)],
+                             axis=1)
+ 
+        all_data['macd'] = pd.DataFrame(MACD(all_data, fastperiod=12, slowperiod=26)['macd'])
+        all_data['rsi'] = pd.DataFrame(RSI(all_data, timeperiod=14))
+        all_data['willr'] = pd.DataFrame(WILLR(all_data, timeperiod=14))
+        all_data['cci'] = pd.DataFrame(CCI(all_data, timeperiod=14))
+        
+        all_data['pct_change_20'] = ROC(all_data, timeperiod=20)
+        all_data['pct_change_30'] = ROC(all_data, timeperiod=30)
+        all_data['pct_change_60'] = ROC(all_data, timeperiod=60)
+
+        all_data.dropna(inplace=True)
+
+        all_data = all_data.join(pd.concat([train_label,val_label]))
+
+        data = all_data[-traindata_len-253:] #253 is the length of test set
+        return data
+
+def train_rf(feature,label,params_dummy):
+        rf =  RandomForestClassifier(random_state=10,n_estimators=70)
+        rf.fit(feature,label)
+
+        return rf
 
 def train_xgb(feature,label,params_xgb):
         
@@ -100,9 +173,11 @@ def val():
         
         accuracy = 0
         
-        prob_list =[0.4, 0.45, 0.4, 0.45, 0.65, 0.65] 
-        valdata_len_list = [1, 5, 5, 3, 5, 1] 
-        train_data_len_list = [250, 100, 100, 350, 300, 100] 
+        prob_list =[0.4, 0.45, 0.4, 0.4, 0.65, 0.65] 
+        valdata_len_list = [1, 5, 5, 1, 5, 1] 
+        train_data_len_list = [250, 100, 100, 200, 300, 100]
+        use_diff = [False , False , False , False , False , False]
+        use_model = ['xgb' , 'xgb' , 'xgb' ,'rf' ,'xgb','xgb']
 
         params_xgb = {
         'max_depth': 10,
@@ -113,6 +188,17 @@ def val():
         'n_estimators': 50
         }
 
+        model_method = {
+            'rf': train_rf,
+            'xgb': train_xgb
+        }
+
+        feature_method = {
+                'rf' : feature_extract_rf,
+                'xgb': feature_extract_xgb
+        }
+
+
         for ind in range(6):
 
                 train_data_len = train_data_len_list[ind]
@@ -120,13 +206,14 @@ def val():
                 val_dummy = valdata_len
                 prob = prob_list[ind]
 
-                data = feature_extract(train_data_len,ind=ind)
+                data = feature_method[use_model[ind]](train_data_len,ind, use_diff[ind])
 
                 window_start = train_data_len +253
                 window_end = 253
                 
                 # print('The target metal is {} '.format(testfiles_oi[ind].split('_')[0]))
                 # print('the hyperparameter is(train , val , prob) :  ' , train_data_len ,' ', valdata_len , ' ' , prob , ' ')
+                # print('use model : ' , use_model[ind])
                 # print('the params of xgb is ' , params_xgb)
 
                 flag = 1
@@ -134,6 +221,7 @@ def val():
 
                 
                 prefix = valfiles_oi[ind].split('_')[0]+'-test-20d'
+                method = model_method[use_model[ind]]
                 while(flag):
                         
                         if(window_end <= valdata_len):
@@ -143,7 +231,7 @@ def val():
                         train_data = data[-window_start:-window_end] 
                         train_feature = train_data[train_data.columns.difference(['label'])]
                         train_label = train_data['label']
-                        xgboost = train_xgb(train_feature,train_label,params_xgb)
+                        model = method(train_feature,train_label,params_xgb)
 
                         if(flag):
                                 val_data = data[-window_end:-window_end+valdata_len]
@@ -151,9 +239,15 @@ def val():
                                 val_data = data[-window_end:]
                         val_feature = val_data[val_data.columns.difference(['label'])]
 
-                        y_pred = xgboost.predict_proba(val_feature)[:,1]
-                        y_pred[y_pred>prob]=1
-                        y_pred[y_pred<=prob]=0
+                        #Because yunjin use the prob of getting 0
+                        if use_model[ind] == 'rf':
+                                y_pred = model.predict_proba(val_feature)[:,0]
+                                y_pred = [0 if x>prob else 1 for x in y_pred]
+                        # And I use the prob of getting 1 like stage1
+                        else:
+                                y_pred = model.predict_proba(val_feature)[:,1]
+                                y_pred[y_pred>prob]=1
+                                y_pred[y_pred<=prob]=0
                         y_pred_all = np.append(y_pred_all,y_pred)
 
                         if(flag):
