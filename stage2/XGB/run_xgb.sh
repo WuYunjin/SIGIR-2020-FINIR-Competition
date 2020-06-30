@@ -13,7 +13,7 @@ n_estimators='50'
 eta='0.01'
 depth='10'
 day='60'
-log='0.65'
+log='0.6'
 #不要用逗号，定义变量后面不能直接加注释
 use_diff_list=("False" "True")
 

@@ -171,11 +171,11 @@ def val():
     base = np.mean(result.loc[result['id'].str.contains('test-60d')]['label'].values==0)
     accuracy = 0
 
-    prob_list =[0.6, 0.5, 0.4, 0.5, 0.2, 0.4] 
-    valdata_len_list = [10, 1, 1, 1, 1, 1] 
-    train_data_len_list = [200, 150, 150, 150, 150, 150]
-    use_diff = [True , False , False , False , False , False]
-    use_model = ['xgb' , 'rf' ,'rf' ,'rf' ,'rf','rf']
+    prob_list =[0.4, 0.5, 0.4, 0.5, 0.2, 0.4] 
+    valdata_len_list = [1, 1, 1, 1, 1, 1] 
+    train_data_len_list = [150, 150, 150, 150, 150, 150]
+    use_diff = [False , False , False , False , False , False]
+    use_model = ['rf' , 'rf' ,'rf' ,'rf' ,'rf','rf']
 
     params_xgb = {
         'max_depth': 10,
@@ -194,7 +194,7 @@ def val():
 
     feature_method = {
         'rf' : feature_extract_rf,
-        'xgb': feature_extract_xgb
+        'xgb': feature_extract_rf
     }
 
 

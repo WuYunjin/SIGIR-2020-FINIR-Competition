@@ -22,7 +22,7 @@ print("Predicting 1day ....")
 prediction = prediction.append( val_1() )
 
 prediction['label'] = prediction['label'].astype(int)
-prediction.to_csv('result.csv',index=False)
+prediction.to_csv('result_xgb_rf.csv',index=False)
 
 
 time_end=time.time()

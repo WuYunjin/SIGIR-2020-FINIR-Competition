@@ -98,7 +98,7 @@ def feature_extract(traindata_len,ind, add_diff):
         data = all_data[-traindata_len-253:] #253 is the length of validation set
         return data
 
-def feature_extract_60d(traindata_len,ind,add_diff):
+def feature_extract_rf_60d(traindata_len,ind,add_diff):
     
         day = 60
 
@@ -211,7 +211,7 @@ def val():
                 # val_dummy = valdata_len
                 # prob = prob_list[ind]
 
-                data = feature_extract_60d(train_data_len,ind=ind, add_diff=use_diff)
+                data = feature_extract_rf_60d(train_data_len,ind=ind, add_diff=use_diff)
 
                 window_start = train_data_len +253
                 window_end = 253
